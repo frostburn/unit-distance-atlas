@@ -522,6 +522,17 @@
     requestAnimationFrame(drawChart);
   }
 
+  async function fetchCatalog() {
+    for (const url of ["data/catalog.local.json", "data/catalog.json"]) {
+      const response = await fetch(url, { cache: "no-store" });
+      if (response.ok) return response.json();
+      if (url.endsWith("catalog.json")) {
+        throw new Error(`${response.status} ${response.statusText}`);
+      }
+    }
+    throw new Error("No catalog is available");
+  }
+
   function bindEvents() {
     elements.previousButton.addEventListener("click", () => selectRecord(state.selectedIndex - 1));
     elements.nextButton.addEventListener("click", () => selectRecord(state.selectedIndex + 1));
@@ -655,9 +666,7 @@
     bindEvents();
 
     try {
-      const response = await fetch("data/catalog.json", { cache: "no-store" });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      const catalog = await response.json();
+      const catalog = await fetchCatalog();
       state.records = [...(catalog.records ?? [])].sort((a, b) => a.n - b.n);
       if (!state.records.length) {
         throw new Error("The catalog contains no graph records. Run generate.py first.");
@@ -676,7 +685,7 @@
       const fileHint = window.location.protocol === "file:"
         ? " Browsers block local fetches from file:// URLs; run “python serve.py” and open the displayed http:// address."
         : "";
-      showStageMessage(`Could not load data/catalog.json: ${error.message}.${fileHint}`);
+      showStageMessage(`Could not load an atlas catalog: ${error.message}.${fileHint}`);
       console.error(error);
     }
   }

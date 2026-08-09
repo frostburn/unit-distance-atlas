@@ -282,7 +282,8 @@ input:focus-visible,
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
-  will-change: transform;
+  /* Keep the inline SVG in the paint pipeline; a promoted layer is rasterized
+     at its initial resolution and becomes blurry when this transform zooms. */
 }
 
 .artwork-layer svg {

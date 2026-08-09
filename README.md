@@ -7,6 +7,7 @@ The Python generator searches exact cyclotomic host graphs, keeps the best resul
 ```text
 data/
   catalog.json          lightweight index used by the chart
+  catalog.local.json    ignored index written by local generation
   graphs/0001.svg       transparent, title-free SVG artwork
   records/0001.json     caption, provenance, vertex table, and edge table
 ```
@@ -23,6 +24,11 @@ python generate.py --max-n 200 --restarts 8
 ```
 
 This searches every size from 1 through 200. A restart produces one nested family, so a single search pass contributes candidates for every `n`, rather than running 200 unrelated searches.
+
+Generation writes its index to the Git-ignored `data/catalog.local.json`, using
+that file on later runs and falling back to the published `data/catalog.json`
+on the first run. Generated graph and record files above 120 points are also
+ignored so local experiments do not expand the checked-in atlas accidentally.
 
 Available exact host families are:
 

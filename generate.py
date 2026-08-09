@@ -7,7 +7,8 @@ are adjacent exactly when their difference is an m-th root of unity.  Floating
 point is used only for the planar embedding written to SVG/JSON.
 
 A run searches all sizes in one pass per restart by randomized low-degree
-peeling.  Existing records are read from data/catalog.json and an SVG/metadata
+peeling.  Existing records are read from data/catalog.local.json (falling back
+to the published data/catalog.json) and an SVG/metadata
 pair is replaced only when the new graph has strictly more unit-distance edges.
 
 Typical use:
@@ -383,7 +384,9 @@ def randomized_peel(
 
 
 def load_existing_records(data_dir: Path) -> dict[int, StoredRecord]:
-    catalog_path = data_dir / "catalog.json"
+    local_catalog_path = data_dir / "catalog.local.json"
+    published_catalog_path = data_dir / "catalog.json"
+    catalog_path = local_catalog_path if local_catalog_path.exists() else published_catalog_path
     records: dict[int, StoredRecord] = {}
 
     if catalog_path.exists():
@@ -692,7 +695,7 @@ def emit_winning_records(
     return summaries
 
 
-def write_catalog(root: Path, records: dict[int, StoredRecord]) -> None:
+def write_catalog(root: Path, records: dict[int, StoredRecord]) -> Path:
     summaries = [records[n].summary for n in sorted(records)]
     catalog = {
         "schemaVersion": SCHEMA_VERSION,
@@ -701,7 +704,9 @@ def write_catalog(root: Path, records: dict[int, StoredRecord]) -> None:
         "recordCount": len(records),
         "records": summaries,
     }
-    atomic_write_json(root / "data" / "catalog.json", catalog, pretty=True)
+    catalog_path = root / "data" / "catalog.local.json"
+    atomic_write_json(catalog_path, catalog, pretty=True)
+    return catalog_path
 
 
 def parse_host_names(value: str) -> set[str]:
@@ -828,8 +833,8 @@ def main() -> None:
     else:
         print("\nno existing record was beaten", flush=True)
 
-    write_catalog(root, existing)
-    print(f"\ncatalog: {root / 'data' / 'catalog.json'}", flush=True)
+    catalog_path = write_catalog(root, existing)
+    print(f"\ncatalog: {catalog_path}", flush=True)
 
 
 if __name__ == "__main__":

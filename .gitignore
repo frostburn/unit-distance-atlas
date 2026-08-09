@@ -214,5 +214,17 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Locally generated atlas data. The published atlas is intentionally capped at
+# 120 points; generation above that limit must not add large artifacts to Git.
+data/catalog.local.json
+data/graphs/012[1-9].svg
+data/graphs/01[3-9][0-9].svg
+data/graphs/0[2-9][0-9][0-9].svg
+data/graphs/[1-9][0-9][0-9][0-9].svg
+data/records/012[1-9].json
+data/records/01[3-9][0-9].json
+data/records/0[2-9][0-9][0-9].json
+data/records/[1-9][0-9][0-9][0-9].json
+
 # Streamlit
 .streamlit/secrets.toml
