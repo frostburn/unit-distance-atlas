@@ -444,8 +444,8 @@
   }
 
   function applyViewTransform() {
-    const svg = elements.artworkLayer.querySelector(":scope > svg");
-    if (!svg) return;
+    const svg = elements.artworkLayer.firstElementChild;
+    if (!svg || svg.localName !== "svg") return;
 
     if (!view.artworkBounds) {
       // Measure the CSS layout at its natural size. Changing the SVG's box
@@ -455,11 +455,13 @@
       svg.style.removeProperty("left");
       svg.style.removeProperty("width");
       svg.style.removeProperty("height");
+      const svgRect = svg.getBoundingClientRect();
+      const layerRect = elements.artworkLayer.getBoundingClientRect();
       view.artworkBounds = {
-        top: svg.offsetTop,
-        left: svg.offsetLeft,
-        width: svg.offsetWidth,
-        height: svg.offsetHeight,
+        top: svgRect.top - layerRect.top,
+        left: svgRect.left - layerRect.left,
+        width: svgRect.width,
+        height: svgRect.height,
       };
     }
 
