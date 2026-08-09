@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """Generate and maintain a local atlas of dense planar unit-distance graphs.
 
-The search works inside exact cyclotomic host graphs.  A host vertex is an
-integer coefficient vector in the power basis of Q(zeta_m); two host vertices
-are adjacent exactly when their difference is an m-th root of unity.  Floating
-point is used only for the planar embedding written to SVG/JSON.
+The search works inside exact algebraic host graphs.  Most hosts are
+cyclotomic: a vertex is an integer coefficient vector in the power basis of
+Q(zeta_m), and two vertices are adjacent exactly when their difference is an
+m-th root of unity.  The generator also searches the four-dimensional Moser
+lattice, whose 18 unit vectors are represented by exact integer tuples.
+Floating point is used only for the planar embedding written to SVG/JSON.
 
 A run searches all sizes in one pass per restart by randomized low-degree
 peeling.  Existing records are read from data/catalog.local.json (falling back
 to the published data/catalog.json) and an SVG/metadata
 pair is replaced only when the new graph has strictly more unit-distance edges.
+
+For n <= 21, published optimal Moser-lattice constructions are installed as a
+deterministic floor before heuristic search.  This prevents an unlucky peel
+from regressing below the proven values of A186705.
 
 Typical use:
 
@@ -50,9 +56,167 @@ MAX_N = 9_999
 PUBLISHED_MAX_N = 120
 PAD_WIDTH = 4
 SCHEMA_VERSION = 1
-GENERATOR_VERSION = "3.0"
+GENERATOR_VERSION = "3.1"
 X = sp.Symbol("x")
 Vec = tuple[int, ...]
+
+
+# The 18 unit vectors of the Moser lattice in the basis
+# (1, omega_1, omega_3, omega_1 * omega_3), where
+#   omega_1 = exp(i*pi/3)
+#   omega_3 = exp(i*acos(5/6)).
+#
+# Source: Engel, Hammond-Lee, Su, Varga and Zsamboki,
+# "Diverse beam search to find densest-known planar unit distance graphs",
+# arXiv:2406.15317, Theorem 2.5 / Figure 2.
+MOSER_STEPS: tuple[Vec, ...] = (
+    (-2, 1, 2, -1),
+    (-1, -1, 1, 1),
+    (-1, 0, 0, 0),
+    (-1, 1, 0, 0),
+    (-1, 2, 1, -2),
+    (0, -1, 0, 0),
+    (0, 0, -1, 0),
+    (0, 0, -1, 1),
+    (0, 0, 0, -1),
+    (0, 0, 0, 1),
+    (0, 0, 1, -1),
+    (0, 0, 1, 0),
+    (0, 1, 0, 0),
+    (1, -2, -1, 2),
+    (1, -1, 0, 0),
+    (1, 0, 0, 0),
+    (1, 1, -1, -1),
+    (2, -1, -2, 1),
+)
+
+
+# Exact extremal constructions for n=1..21.  Each row is a point of the Moser
+# lattice in the basis documented above.  We independently verify every edge
+# count when materializing a record.  For n=13..21, their abstract graphs were
+# also checked against graph6 representatives published with
+# Alexeev--Mixon--Parshall, arXiv:2412.11914v2 (ancillary graph6.txt).
+KNOWN_EXACT_MOSER_POINTS: dict[int, tuple[Vec, ...]] = {
+    1: ((0, 0, 0, 0),),
+    2: ((0, 0, 1, 1), (1, 1, 0, 0)),
+    3: ((0, 1, 2, 1), (1, 2, 1, 0), (2, 0, 0, 2)),
+    4: ((0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1)),
+    5: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 0, 2),
+        (0, 0, 1, 0), (0, 0, 1, 1),
+    ),
+    6: (
+        (0, 1, 3, 3), (0, 4, 3, 0), (1, 2, 2, 2),
+        (2, 0, 1, 4), (2, 3, 1, 1), (3, 1, 0, 3),
+    ),
+    7: (
+        (0, 0, 0, 1), (0, 0, 0, 2), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 0, 1, 2), (0, 0, 2, 0), (0, 0, 2, 1),
+    ),
+    8: (
+        (0, 1, 1, 2), (0, 2, 2, 0), (0, 3, 2, 0), (1, 0, 1, 2),
+        (1, 1, 1, 2), (1, 2, 0, 1), (2, 1, 0, 1), (2, 2, 0, 1),
+    ),
+    9: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0),
+        (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0),
+        (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0),
+    ),
+    10: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0),
+        (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0),
+    ),
+    11: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1),
+        (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0),
+    ),
+    12: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1),
+        (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0), (1, 0, 1, 1),
+    ),
+    13: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1),
+        (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0), (1, 0, 1, 1),
+        (1, 1, 0, 0),
+    ),
+    14: (
+        (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1), (0, 1, 0, 0),
+        (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1), (1, 0, 0, 0),
+        (1, 0, 0, 1), (1, 0, 1, 0), (1, 0, 1, 1), (1, 1, 0, 0),
+        (1, 1, 0, 1), (1, 1, 1, 0),
+    ),
+    15: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1),
+        (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0), (1, 0, 1, 1),
+        (1, 1, 0, 0), (1, 1, 0, 1), (1, 1, 1, 0),
+    ),
+    16: tuple(itertools.product((0, 1), repeat=4)),
+    17: (
+        (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1), (0, 0, 2, 0),
+        (0, 0, 2, 1), (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1),
+        (0, 1, 2, 0), (1, 0, 0, 1), (1, 0, 1, 0), (1, 0, 1, 1),
+        (1, 0, 2, 0), (1, 1, 0, 1), (1, 1, 1, 0), (1, 1, 1, 1),
+        (1, 1, 2, 0),
+    ),
+    18: (
+        (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1), (0, 0, 2, 0),
+        (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1),
+        (0, 1, 2, 0), (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0),
+        (1, 0, 1, 1), (1, 0, 2, 0), (1, 1, 0, 0), (1, 1, 0, 1),
+        (1, 1, 1, 0), (1, 1, 1, 1),
+    ),
+    19: (
+        (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1), (0, 0, 2, 0),
+        (0, 0, 2, 1), (0, 1, 0, 1), (0, 1, 1, 0), (0, 1, 1, 1),
+        (0, 1, 2, 0), (0, 1, 2, 1), (1, 0, 0, 1), (1, 0, 1, 0),
+        (1, 0, 1, 1), (1, 0, 2, 0), (1, 0, 2, 1), (1, 1, 0, 1),
+        (1, 1, 1, 0), (1, 1, 1, 1), (1, 1, 2, 0),
+    ),
+    20: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 0, 2, 0), (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0),
+        (0, 1, 1, 1), (0, 1, 2, 0), (1, 0, 0, 0), (1, 0, 0, 1),
+        (1, 0, 1, 0), (1, 0, 1, 1), (1, 0, 2, 0), (1, 1, 0, 0),
+        (1, 1, 0, 1), (1, 1, 1, 0), (1, 1, 1, 1), (1, 1, 2, 0),
+    ),
+    21: (
+        (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1),
+        (0, 0, 2, 0), (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0),
+        (0, 1, 1, 1), (0, 1, 2, 0), (1, 0, 0, 0), (1, 0, 0, 1),
+        (1, 0, 1, 0), (1, 0, 1, 1), (1, 0, 2, 0), (1, 1, 0, 0),
+        (1, 1, 0, 1), (1, 1, 1, 0), (1, 1, 1, 1), (1, 1, 2, 0),
+        (2, 0, 0, 1),
+    ),
+}
+
+KNOWN_EXACT_EDGE_COUNTS = {
+    1: 0,
+    2: 1,
+    3: 3,
+    4: 5,
+    5: 7,
+    6: 9,
+    7: 12,
+    8: 14,
+    9: 18,
+    10: 20,
+    11: 23,
+    12: 27,
+    13: 30,
+    14: 33,
+    15: 37,
+    16: 41,
+    17: 43,
+    18: 46,
+    19: 50,
+    20: 54,
+    21: 57,
+}
 
 
 def utc_now() -> str:
@@ -119,8 +283,10 @@ class HostSpec:
     label: str
     kind: str
     m: int
+    basis: str = "cyclotomic"
     lengths: tuple[int, ...] = ()
     active_coordinates: tuple[int, ...] = ()
+    explicit_points: tuple[Vec, ...] = ()
 
     @property
     def size(self) -> int:
@@ -128,6 +294,8 @@ class HostSpec:
             return product(self.lengths)
         if self.kind == "binary":
             return 1 << len(self.active_coordinates)
+        if self.kind == "explicit":
+            return len(self.explicit_points)
         raise ValueError(f"unknown host kind {self.kind!r}")
 
     def metadata(self, basis_dimension: int) -> dict[str, object]:
@@ -135,14 +303,21 @@ class HostSpec:
             "key": self.key,
             "label": self.label,
             "kind": self.kind,
-            "cyclotomicOrder": self.m,
+            "basisType": self.basis,
             "basisDimension": basis_dimension,
             "hostVertices": self.size,
         }
+        if self.basis == "cyclotomic":
+            result["cyclotomicOrder"] = self.m
+        elif self.basis == "moser":
+            result["coordinateRing"] = "Moser lattice"
+            result["basis"] = ["1", "omega_1", "omega_3", "omega_1*omega_3"]
         if self.lengths:
             result["lengths"] = list(self.lengths)
         if self.active_coordinates:
             result["activeCoordinates"] = list(self.active_coordinates)
+        if self.explicit_points:
+            result["constructionVertices"] = len(self.explicit_points)
         return result
 
 
@@ -211,11 +386,24 @@ def points_for_spec(spec: HostSpec, dimension: int) -> list[Vec]:
             points.append(tuple(vector))
         return points
 
+    if spec.kind == "explicit":
+        if any(len(point) != dimension for point in spec.explicit_points):
+            raise ValueError(f"{spec.key}: explicit point has the wrong basis dimension")
+        if len(set(spec.explicit_points)) != len(spec.explicit_points):
+            raise ValueError(f"{spec.key}: duplicate explicit point")
+        return list(spec.explicit_points)
+
     raise ValueError(f"unknown host kind {spec.kind!r}")
 
 
 def build_host(spec: HostSpec) -> Host:
-    dimension, steps = cyclotomic_steps(spec.m)
+    if spec.basis == "cyclotomic":
+        dimension, steps = cyclotomic_steps(spec.m)
+    elif spec.basis == "moser":
+        dimension, steps = 4, list(MOSER_STEPS)
+    else:
+        raise ValueError(f"unknown basis type {spec.basis!r}")
+
     points = points_for_spec(spec, dimension)
     index = {point: i for i, point in enumerate(points)}
     neighbors: list[list[int]] = [[] for _ in points]
@@ -249,7 +437,7 @@ def spread_coordinates(dimension: int, count: int) -> tuple[int, ...]:
 
 
 def host_specs(max_n: int, requested: set[str]) -> list[HostSpec]:
-    available = {"hex", "z12", "z18", "z24", "z30", "binary"}
+    available = {"hex", "moser", "z12", "z18", "z24", "z30", "binary"}
     unknown = requested - available
     if unknown:
         raise ValueError(f"unknown host name(s): {', '.join(sorted(unknown))}")
@@ -270,8 +458,24 @@ def host_specs(max_n: int, requested: set[str]) -> list[HostSpec]:
             )
         )
 
+    def add_moser_box(factor: float = 1.25) -> None:
+        target = max(max_n, math.ceil(max_n * factor))
+        lengths = balanced_lengths(4, target, minimum=2)
+        specs.append(
+            HostSpec(
+                key=f"moser-{'x'.join(map(str, lengths))}",
+                label=f"Moser lattice box {'×'.join(map(str, lengths))}",
+                kind="box",
+                m=0,
+                basis="moser",
+                lengths=lengths,
+            )
+        )
+
     if "hex" in requested:
         add_box("hex", 6, 1.08, minimum=1)
+    if "moser" in requested:
+        add_moser_box()
     if "z12" in requested:
         add_box("z12", 12, 1.12)
     if "z18" in requested:
@@ -430,6 +634,37 @@ def complex_coordinates(points: Sequence[Vec], m: int) -> list[complex]:
     return [sum(coefficient * power for coefficient, power in zip(point, powers)) for point in points]
 
 
+def moser_coordinates(points: Sequence[Vec]) -> list[complex]:
+    omega_1 = complex(0.5, math.sqrt(3) / 2)
+    omega_3 = complex(5 / 6, math.sqrt(11) / 6)
+    basis = (1 + 0j, omega_1, omega_3, omega_1 * omega_3)
+    return [sum(coefficient * value for coefficient, value in zip(point, basis)) for point in points]
+
+
+def coordinates_for_host(host: Host) -> list[complex]:
+    if host.spec.basis == "cyclotomic":
+        return complex_coordinates(host.points, host.spec.m)
+    if host.spec.basis == "moser":
+        return moser_coordinates(host.points)
+    raise ValueError(f"unknown basis type {host.spec.basis!r}")
+
+
+def embedding_description(spec: HostSpec) -> str:
+    if spec.basis == "cyclotomic":
+        return f"ζ_{spec.m} ↦ exp(2πi/{spec.m})"
+    if spec.basis == "moser":
+        return "(1, omega_1, omega_3, omega_1*omega_3), omega_1=exp(i*pi/3), omega_3=exp(i*acos(5/6))"
+    raise ValueError(f"unknown basis type {spec.basis!r}")
+
+
+def unit_distance_rule(spec: HostSpec) -> str:
+    if spec.basis == "cyclotomic":
+        return "an edge difference is a root of unity"
+    if spec.basis == "moser":
+        return "an edge difference is one of the 18 exact unit vectors of the Moser lattice"
+    raise ValueError(f"unknown basis type {spec.basis!r}")
+
+
 def compact_number(value: float, digits: int = 6) -> str:
     if abs(value) < 0.5 * 10 ** (-digits):
         value = 0.0
@@ -566,6 +801,28 @@ def make_metadata(
             [vertex_id, *point, round(coordinate.real, 12), round(coordinate.imag, 12)]
         )
 
+    if run.restart == 0:
+        search_metadata: dict[str, object] = {
+            "algorithm": "published exact Moser-lattice construction",
+            "generatorVersion": GENERATOR_VERSION,
+            "source": {
+                "title": "The Erdős unit distance problem for small point sets",
+                "authors": "Boris Alexeev, Dustin G. Mixon, Hans Parshall",
+                "arxiv": "2412.11914v2",
+                "verification": "induced graph matches a published ancillary graph6 representative",
+            },
+        }
+    else:
+        search_metadata = {
+            "algorithm": "randomized low-degree nested peeling",
+            "generatorVersion": GENERATOR_VERSION,
+            "restart": run.restart,
+            "restartsInBatch": restarts_in_batch,
+            "runSeed": run.run_seed,
+            "choicePool": run.choice_pool,
+            "degreeSlack": run.degree_slack,
+        }
+
     metadata: dict[str, object] = {
         "schemaVersion": SCHEMA_VERSION,
         "id": filename,
@@ -581,18 +838,10 @@ def make_metadata(
             "metadata": f"{filename}.json",
         },
         "host": host.spec.metadata(host.basis_dimension),
-        "search": {
-            "algorithm": "randomized low-degree nested peeling",
-            "generatorVersion": GENERATOR_VERSION,
-            "restart": run.restart,
-            "restartsInBatch": restarts_in_batch,
-            "runSeed": run.run_seed,
-            "choicePool": run.choice_pool,
-            "degreeSlack": run.degree_slack,
-        },
+        "search": search_metadata,
         "geometry": {
-            "embedding": f"ζ_{host.spec.m} ↦ exp(2πi/{host.spec.m})",
-            "unitDistanceRule": "an edge difference is a root of unity",
+            "embedding": embedding_description(host.spec),
+            "unitDistanceRule": unit_distance_rule(host.spec),
             "vertexTable": {
                 "columns": vertex_columns,
                 "rows": vertex_rows,
@@ -603,6 +852,12 @@ def make_metadata(
             },
         },
     }
+    if run.restart == 0:
+        metadata["optimality"] = {
+            "status": "proven optimal",
+            "sequence": "OEIS A186705",
+            "certifiedThrough": 21,
+        }
     return metadata
 
 
@@ -636,7 +891,7 @@ def emit_winning_records(
     for spec, runs in runs_by_spec.items():
         print(f"materializing {spec.label} …", flush=True)
         host = build_host(spec)
-        all_coordinates = complex_coordinates(host.points, spec.m)
+        all_coordinates = coordinates_for_host(host)
         host_size = len(host.points)
 
         for run in runs:
@@ -737,10 +992,69 @@ def write_catalogs(
     return written
 
 
+def seed_known_exact_constructions(
+    *,
+    min_n: int,
+    max_n: int,
+    best_edges: list[int],
+    winning: dict[int, PeelRun],
+) -> int:
+    """Install published optimal constructions for the small exact range.
+
+    These are ordinary candidates in the record pipeline: they replace an
+    existing record only when their edge count is strictly larger.  Later
+    heuristic search may replace them only by finding an even denser exact
+    unit-distance graph.
+    """
+    installed = 0
+
+    for n, points in KNOWN_EXACT_MOSER_POINTS.items():
+        if not min_n <= n <= max_n:
+            continue
+
+        expected = KNOWN_EXACT_EDGE_COUNTS[n]
+        if expected <= best_edges[n]:
+            continue
+
+        spec = HostSpec(
+            key=f"known-exact-moser-{n}",
+            label=f"known optimal Moser-lattice graph (n={n})",
+            kind="explicit",
+            m=0,
+            basis="moser",
+            explicit_points=points,
+        )
+
+        # Verify the embedded construction rather than trusting the table.
+        host = build_host(spec)
+        actual = sum(len(row) for row in host.neighbors) // 2
+        if actual != expected:
+            raise AssertionError(
+                f"known exact construction n={n} has {actual} edges, expected {expected}"
+            )
+
+        # emit_winning_records reconstructs a host by starting at last_vertex
+        # and then reversing removal_order.  This order reproduces 0,1,...,n-1.
+        run = PeelRun(
+            spec=spec,
+            removal_order=array("I", range(n - 1, 0, -1)),
+            last_vertex=0,
+            restart=0,
+            run_seed=0,
+            choice_pool=0,
+            degree_slack=0,
+        )
+        best_edges[n] = expected
+        winning[n] = run
+        installed += 1
+
+    return installed
+
+
 def parse_host_names(value: str) -> set[str]:
     value = value.strip().lower()
     if value == "all":
-        return {"hex", "z12", "z18", "z24", "z30", "binary"}
+        return {"hex", "moser", "z12", "z18", "z24", "z30", "binary"}
     result = {item.strip() for item in value.split(",") if item.strip()}
     if not result:
         raise argparse.ArgumentTypeError("host list may not be empty")
@@ -756,8 +1070,8 @@ def main() -> None:
     parser.add_argument(
         "--hosts",
         type=parse_host_names,
-        default=parse_host_names("hex,z12,z18,z24,binary"),
-        help="comma-separated: hex,z12,z18,z24,z30,binary; or all",
+        default=parse_host_names("hex,moser,z12,z18,z24,binary"),
+        help="comma-separated: hex,moser,z12,z18,z24,z30,binary; or all",
     )
     parser.add_argument(
         "--output",
@@ -785,6 +1099,18 @@ def main() -> None:
     for n in range(args.min_n, args.max_n + 1):
         if n in existing:
             best_edges[n] = existing[n].edges
+
+    exact_improvements = seed_known_exact_constructions(
+        min_n=args.min_n,
+        max_n=args.max_n,
+        best_edges=best_edges,
+        winning=winning,
+    )
+    if exact_improvements:
+        print(
+            f"installed {exact_improvements} published exact small-n improvement(s)",
+            flush=True,
+        )
 
     specs = host_specs(args.max_n, args.hosts)
     print(
