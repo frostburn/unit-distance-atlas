@@ -7,7 +7,8 @@ are adjacent exactly when their difference is an m-th root of unity.  Floating
 point is used only for the planar embedding written to SVG/JSON.
 
 A run searches all sizes in one pass per restart by randomized low-degree
-peeling.  Existing records are read from data/catalog.json and an SVG/metadata
+peeling.  Existing records are read from data/catalog.local.json (falling back
+to the published data/catalog.json) and an SVG/metadata
 pair is replaced only when the new graph has strictly more unit-distance edges.
 
 Typical use:
@@ -46,6 +47,7 @@ except ImportError as exc:  # pragma: no cover - friendly CLI failure
     raise SystemExit("SymPy is required: pip install sympy") from exc
 
 MAX_N = 9_999
+PUBLISHED_MAX_N = 120
 PAD_WIDTH = 4
 SCHEMA_VERSION = 1
 GENERATOR_VERSION = "3.0"
@@ -383,7 +385,9 @@ def randomized_peel(
 
 
 def load_existing_records(data_dir: Path) -> dict[int, StoredRecord]:
-    catalog_path = data_dir / "catalog.json"
+    local_catalog_path = data_dir / "catalog.local.json"
+    published_catalog_path = data_dir / "catalog.json"
+    catalog_path = local_catalog_path if local_catalog_path.exists() else published_catalog_path
     records: dict[int, StoredRecord] = {}
 
     if catalog_path.exists():
@@ -692,16 +696,45 @@ def emit_winning_records(
     return summaries
 
 
-def write_catalog(root: Path, records: dict[int, StoredRecord]) -> None:
-    summaries = [records[n].summary for n in sorted(records)]
-    catalog = {
+def catalog_document(
+    records: dict[int, StoredRecord], *, generated_at: str, max_n: int | None = None
+) -> dict[str, object]:
+    selected = [n for n in sorted(records) if max_n is None or n <= max_n]
+    return {
         "schemaVersion": SCHEMA_VERSION,
-        "generatedAt": utc_now(),
-        "maxN": max(records, default=0),
-        "recordCount": len(records),
-        "records": summaries,
+        "generatedAt": generated_at,
+        "maxN": max(selected, default=0),
+        "recordCount": len(selected),
+        "records": [records[n].summary for n in selected],
     }
-    atomic_write_json(root / "data" / "catalog.json", catalog, pretty=True)
+
+
+def write_catalogs(
+    root: Path, records: dict[int, StoredRecord], *, update_published: bool
+) -> list[Path]:
+    generated_at = utc_now()
+    catalog_path = root / "data" / "catalog.local.json"
+    atomic_write_json(
+        catalog_path,
+        catalog_document(records, generated_at=generated_at),
+        pretty=True,
+    )
+    written = [catalog_path]
+
+    if update_published:
+        published_path = root / "data" / "catalog.json"
+        atomic_write_json(
+            published_path,
+            catalog_document(
+                records,
+                generated_at=generated_at,
+                max_n=PUBLISHED_MAX_N,
+            ),
+            pretty=True,
+        )
+        written.append(published_path)
+
+    return written
 
 
 def parse_host_names(value: str) -> set[str]:
@@ -828,8 +861,14 @@ def main() -> None:
     else:
         print("\nno existing record was beaten", flush=True)
 
-    write_catalog(root, existing)
-    print(f"\ncatalog: {root / 'data' / 'catalog.json'}", flush=True)
+    catalog_paths = write_catalogs(
+        root,
+        existing,
+        update_published=any(n <= PUBLISHED_MAX_N for n in winning),
+    )
+    print(f"\ncatalog: {catalog_paths[0]}", flush=True)
+    if len(catalog_paths) > 1:
+        print(f"published catalog: {catalog_paths[1]}", flush=True)
 
 
 if __name__ == "__main__":
