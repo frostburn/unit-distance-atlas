@@ -47,6 +47,7 @@
     scale: 1,
     x: 0,
     y: 0,
+    artworkBounds: null,
     pointers: new Map(),
     gesture: null,
   };
@@ -111,6 +112,10 @@
 
   function putSvg(container, text) {
     container.replaceChildren(parseSvg(text));
+    if (container === elements.artworkLayer) {
+      view.artworkBounds = null;
+      applyViewTransform();
+    }
   }
 
   function nearestRecordIndex(targetN) {
@@ -439,7 +444,32 @@
   }
 
   function applyViewTransform() {
-    elements.artworkLayer.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    const svg = elements.artworkLayer.firstElementChild;
+    if (!svg || svg.localName !== "svg") return;
+
+    if (!view.artworkBounds) {
+      // Measure the CSS layout at its natural size. Changing the SVG's box
+      // instead of transforming a fixed-size layer keeps the browser painting
+      // the vectors at the current zoom rather than enlarging a cached bitmap.
+      svg.style.removeProperty("top");
+      svg.style.removeProperty("left");
+      svg.style.removeProperty("width");
+      svg.style.removeProperty("height");
+      const svgRect = svg.getBoundingClientRect();
+      const layerRect = elements.artworkLayer.getBoundingClientRect();
+      view.artworkBounds = {
+        top: svgRect.top - layerRect.top,
+        left: svgRect.left - layerRect.left,
+        width: svgRect.width,
+        height: svgRect.height,
+      };
+    }
+
+    const bounds = view.artworkBounds;
+    svg.style.top = `${view.y + bounds.top * view.scale}px`;
+    svg.style.left = `${view.x + bounds.left * view.scale}px`;
+    svg.style.width = `${bounds.width * view.scale}px`;
+    svg.style.height = `${bounds.height * view.scale}px`;
   }
 
   function resetZoom() {
@@ -552,7 +582,12 @@
     elements.zoomInButton.addEventListener("click", () => zoomAtStageCenter(1.3));
     elements.zoomOutButton.addEventListener("click", () => zoomAtStageCenter(1 / 1.3));
     elements.resetZoomButton.addEventListener("click", resetZoom);
-    elements.stage.addEventListener("dblclick", resetZoom);
+    elements.stage.addEventListener("dblclick", (event) => {
+      // Rapid button presses also emit a bubbling dblclick; do not interpret
+      // that as the stage's double-click-to-reset gesture.
+      if (event.target.closest("button, a, input")) return;
+      resetZoom();
+    });
     elements.stage.addEventListener("dragstart", (event) => event.preventDefault());
 
     elements.stage.addEventListener(
@@ -566,6 +601,9 @@
     );
 
     elements.stage.addEventListener("pointerdown", (event) => {
+      // Let controls inside the stage receive their normal click. Capturing a
+      // button's pointer on the stage retargets the eventual click to the stage.
+      if (event.target.closest("button, a, input")) return;
       if (event.pointerType === "mouse" && event.button !== 0) return;
       elements.stage.setPointerCapture(event.pointerId);
       view.pointers.set(event.pointerId, localPointer(event));
@@ -651,8 +689,14 @@
       }
     });
 
-    const resizeObserver = new ResizeObserver(() => drawChart());
-    resizeObserver.observe(elements.chartWrap);
+    const chartResizeObserver = new ResizeObserver(() => drawChart());
+    chartResizeObserver.observe(elements.chartWrap);
+
+    const stageResizeObserver = new ResizeObserver(() => {
+      view.artworkBounds = null;
+      applyViewTransform();
+    });
+    stageResizeObserver.observe(elements.stage);
   }
 
   async function initialise() {
