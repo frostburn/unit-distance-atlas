@@ -281,9 +281,6 @@ input:focus-visible,
   --artwork-padding: clamp(1.2rem, 4vw, 4rem);
   position: absolute;
   inset: 0;
-  transform-origin: 0 0;
-  /* Keep the inline SVG in the paint pipeline; a promoted layer is rasterized
-     at its initial resolution and becomes blurry when this transform zooms. */
 }
 
 .artwork-layer svg {

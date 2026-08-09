@@ -47,6 +47,7 @@
     scale: 1,
     x: 0,
     y: 0,
+    artworkBounds: null,
     pointers: new Map(),
     gesture: null,
   };
@@ -111,6 +112,10 @@
 
   function putSvg(container, text) {
     container.replaceChildren(parseSvg(text));
+    if (container === elements.artworkLayer) {
+      view.artworkBounds = null;
+      applyViewTransform();
+    }
   }
 
   function nearestRecordIndex(targetN) {
@@ -439,7 +444,30 @@
   }
 
   function applyViewTransform() {
-    elements.artworkLayer.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    const svg = elements.artworkLayer.querySelector(":scope > svg");
+    if (!svg) return;
+
+    if (!view.artworkBounds) {
+      // Measure the CSS layout at its natural size. Changing the SVG's box
+      // instead of transforming a fixed-size layer keeps the browser painting
+      // the vectors at the current zoom rather than enlarging a cached bitmap.
+      svg.style.removeProperty("top");
+      svg.style.removeProperty("left");
+      svg.style.removeProperty("width");
+      svg.style.removeProperty("height");
+      view.artworkBounds = {
+        top: svg.offsetTop,
+        left: svg.offsetLeft,
+        width: svg.offsetWidth,
+        height: svg.offsetHeight,
+      };
+    }
+
+    const bounds = view.artworkBounds;
+    svg.style.top = `${view.y + bounds.top * view.scale}px`;
+    svg.style.left = `${view.x + bounds.left * view.scale}px`;
+    svg.style.width = `${bounds.width * view.scale}px`;
+    svg.style.height = `${bounds.height * view.scale}px`;
   }
 
   function resetZoom() {
@@ -651,8 +679,14 @@
       }
     });
 
-    const resizeObserver = new ResizeObserver(() => drawChart());
-    resizeObserver.observe(elements.chartWrap);
+    const chartResizeObserver = new ResizeObserver(() => drawChart());
+    chartResizeObserver.observe(elements.chartWrap);
+
+    const stageResizeObserver = new ResizeObserver(() => {
+      view.artworkBounds = null;
+      applyViewTransform();
+    });
+    stageResizeObserver.observe(elements.stage);
   }
 
   async function initialise() {
