@@ -47,6 +47,7 @@ except ImportError as exc:  # pragma: no cover - friendly CLI failure
     raise SystemExit("SymPy is required: pip install sympy") from exc
 
 MAX_N = 9_999
+PUBLISHED_MAX_N = 120
 PAD_WIDTH = 4
 SCHEMA_VERSION = 1
 GENERATOR_VERSION = "3.0"
@@ -695,18 +696,45 @@ def emit_winning_records(
     return summaries
 
 
-def write_catalog(root: Path, records: dict[int, StoredRecord]) -> Path:
-    summaries = [records[n].summary for n in sorted(records)]
-    catalog = {
+def catalog_document(
+    records: dict[int, StoredRecord], *, generated_at: str, max_n: int | None = None
+) -> dict[str, object]:
+    selected = [n for n in sorted(records) if max_n is None or n <= max_n]
+    return {
         "schemaVersion": SCHEMA_VERSION,
-        "generatedAt": utc_now(),
-        "maxN": max(records, default=0),
-        "recordCount": len(records),
-        "records": summaries,
+        "generatedAt": generated_at,
+        "maxN": max(selected, default=0),
+        "recordCount": len(selected),
+        "records": [records[n].summary for n in selected],
     }
+
+
+def write_catalogs(
+    root: Path, records: dict[int, StoredRecord], *, update_published: bool
+) -> list[Path]:
+    generated_at = utc_now()
     catalog_path = root / "data" / "catalog.local.json"
-    atomic_write_json(catalog_path, catalog, pretty=True)
-    return catalog_path
+    atomic_write_json(
+        catalog_path,
+        catalog_document(records, generated_at=generated_at),
+        pretty=True,
+    )
+    written = [catalog_path]
+
+    if update_published:
+        published_path = root / "data" / "catalog.json"
+        atomic_write_json(
+            published_path,
+            catalog_document(
+                records,
+                generated_at=generated_at,
+                max_n=PUBLISHED_MAX_N,
+            ),
+            pretty=True,
+        )
+        written.append(published_path)
+
+    return written
 
 
 def parse_host_names(value: str) -> set[str]:
@@ -833,8 +861,14 @@ def main() -> None:
     else:
         print("\nno existing record was beaten", flush=True)
 
-    catalog_path = write_catalog(root, existing)
-    print(f"\ncatalog: {catalog_path}", flush=True)
+    catalog_paths = write_catalogs(
+        root,
+        existing,
+        update_published=any(n <= PUBLISHED_MAX_N for n in winning),
+    )
+    print(f"\ncatalog: {catalog_paths[0]}", flush=True)
+    if len(catalog_paths) > 1:
+        print(f"published catalog: {catalog_paths[1]}", flush=True)
 
 
 if __name__ == "__main__":

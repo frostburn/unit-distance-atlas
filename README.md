@@ -29,6 +29,9 @@ Generation writes its index to the Git-ignored `data/catalog.local.json`, using
 that file on later runs and falling back to the published `data/catalog.json`
 on the first run. Generated graph and record files above 120 points are also
 ignored so local experiments do not expand the checked-in atlas accidentally.
+When a search improves any record from 1 through 120, the generator also
+refreshes the version-controlled `data/catalog.json`, restricted to that
+published range. Searches that only affect larger graphs leave it untouched.
 
 Available exact host families are:
 
