@@ -582,7 +582,12 @@
     elements.zoomInButton.addEventListener("click", () => zoomAtStageCenter(1.3));
     elements.zoomOutButton.addEventListener("click", () => zoomAtStageCenter(1 / 1.3));
     elements.resetZoomButton.addEventListener("click", resetZoom);
-    elements.stage.addEventListener("dblclick", resetZoom);
+    elements.stage.addEventListener("dblclick", (event) => {
+      // Rapid button presses also emit a bubbling dblclick; do not interpret
+      // that as the stage's double-click-to-reset gesture.
+      if (event.target.closest("button, a, input")) return;
+      resetZoom();
+    });
     elements.stage.addEventListener("dragstart", (event) => event.preventDefault());
 
     elements.stage.addEventListener(
