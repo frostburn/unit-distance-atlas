@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Unit-distance graph atlas</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body data-theme="dark">
+  <header class="toolbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">◇</span>
+      <div>
+        <h1>Unit-distance atlas</h1>
+        <p>Best graph found for each point count</p>
+      </div>
+    </div>
+
+    <div class="toolbar-actions" aria-label="Graph navigation">
+      <button id="previousButton" class="button" type="button" title="Previous graph (←)">
+        <span aria-hidden="true">←</span>
+        <span class="button-label">Previous</span>
+      </button>
+
+      <label class="number-field" for="nInput">
+        <span>Points</span>
+        <input id="nInput" type="number" min="1" max="9999" step="1" inputmode="numeric">
+      </label>
+
+      <button id="nextButton" class="button" type="button" title="Next graph (→)">
+        <span class="button-label">Next</span>
+        <span aria-hidden="true">→</span>
+      </button>
+
+      <button id="themeButton" class="button icon-button" type="button" title="Switch to light mode" aria-label="Switch to light mode">
+        <span id="themeIcon" aria-hidden="true">☀</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="card stage-card" aria-labelledby="graphTitle">
+      <div id="stage" class="stage" tabindex="0" aria-label="Unit-distance graph. Drag to pan; use the mouse wheel or a pinch gesture to zoom.">
+        <div id="artworkLayer" class="artwork-layer" aria-live="polite"></div>
+        <div id="stageMessage" class="stage-message">Loading graph atlas…</div>
+
+        <div class="zoom-controls" aria-label="Zoom controls">
+          <button id="zoomOutButton" class="small-button" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+          <button id="resetZoomButton" class="small-button reset-button" type="button" title="Reset zoom">Reset</button>
+          <button id="zoomInButton" class="small-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+        </div>
+      </div>
+
+      <div class="record-caption">
+        <div class="record-heading">
+          <div>
+            <p id="recordKicker" class="kicker">Record</p>
+            <h2 id="graphTitle">—</h2>
+          </div>
+          <div class="record-links">
+            <a id="svgLink" class="text-link" href="#" target="_blank" rel="noopener">SVG</a>
+            <a id="metadataLink" class="text-link" href="#" target="_blank" rel="noopener">JSON metadata</a>
+          </div>
+        </div>
+
+        <dl class="stats-grid">
+          <div>
+            <dt>Unit distances</dt>
+            <dd id="edgeCount">—</dd>
+          </div>
+          <div>
+            <dt>Average degree</dt>
+            <dd id="averageDegree">—</dd>
+          </div>
+          <div>
+            <dt>Host</dt>
+            <dd id="hostName">—</dd>
+          </div>
+          <div>
+            <dt>Search run</dt>
+            <dd id="searchRun">—</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card chart-card" aria-labelledby="chartTitle">
+      <div class="section-heading">
+        <div>
+          <p class="kicker">Atlas overview</p>
+          <h2 id="chartTitle">Edges found by point count</h2>
+        </div>
+        <p class="section-help">Hover for a preview; click to put that graph on the main stage.</p>
+      </div>
+
+      <div id="chartWrap" class="chart-wrap">
+        <canvas id="recordChart" aria-label="Chart of points against unit-distance edges"></canvas>
+        <div id="chartTooltip" class="chart-tooltip" hidden>
+          <div id="tooltipPreview" class="tooltip-preview"></div>
+          <div class="tooltip-copy">
+            <strong id="tooltipTitle">—</strong>
+            <span id="tooltipSubtitle">—</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <noscript>This frontend requires JavaScript.</noscript>
+</body>
+</html>
