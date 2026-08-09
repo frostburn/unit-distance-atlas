@@ -596,6 +596,9 @@
     );
 
     elements.stage.addEventListener("pointerdown", (event) => {
+      // Let controls inside the stage receive their normal click. Capturing a
+      // button's pointer on the stage retargets the eventual click to the stage.
+      if (event.target.closest("button, a, input")) return;
       if (event.pointerType === "mouse" && event.button !== 0) return;
       elements.stage.setPointerCapture(event.pointerId);
       view.pointers.set(event.pointerId, localPointer(event));
