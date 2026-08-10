@@ -1,0 +1,1613 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-10T15:15:09Z",
+  "policy": [
+    "strict record edge count",
+    "maximum number of one-vertex growth transitions",
+    "minimum host-family changes",
+    "visual balance among remaining ties"
+  ],
+  "growthTransitions": 170,
+  "selection": [
+    {
+      "n": 1,
+      "edges": 0,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 1.0,
+      "recordStreak": 8
+    },
+    {
+      "n": 2,
+      "edges": 1,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 0.38,
+      "recordStreak": 8
+    },
+    {
+      "n": 3,
+      "edges": 3,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 0.8991183,
+      "recordStreak": 8
+    },
+    {
+      "n": 4,
+      "edges": 5,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 0.68117647,
+      "recordStreak": 8
+    },
+    {
+      "n": 5,
+      "edges": 7,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 0.61149016,
+      "recordStreak": 8
+    },
+    {
+      "n": 6,
+      "edges": 9,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 0.78007999,
+      "recordStreak": 8
+    },
+    {
+      "n": 7,
+      "edges": 12,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 0.9676,
+      "recordStreak": 8
+    },
+    {
+      "n": 8,
+      "edges": 14,
+      "runId": "f9b2f915ef359d17ff5b",
+      "host": "hex-15x15",
+      "balanceScore": 0.73389814,
+      "recordStreak": 8
+    },
+    {
+      "n": 9,
+      "edges": 18,
+      "runId": "e85e6d36902bb9fb048f",
+      "host": "known-exact-moser-9",
+      "balanceScore": 0.92720884,
+      "recordStreak": 1
+    },
+    {
+      "n": 10,
+      "edges": 20,
+      "runId": "600d057b07b16b81d723",
+      "host": "known-exact-moser-10",
+      "balanceScore": 0.87487902,
+      "recordStreak": 1
+    },
+    {
+      "n": 11,
+      "edges": 23,
+      "runId": "7620369d6d95aae50672",
+      "host": "known-exact-moser-11",
+      "balanceScore": 0.72062296,
+      "recordStreak": 1
+    },
+    {
+      "n": 12,
+      "edges": 27,
+      "runId": "543533e177bf21d00628",
+      "host": "known-exact-moser-12",
+      "balanceScore": 0.75630299,
+      "recordStreak": 1
+    },
+    {
+      "n": 13,
+      "edges": 30,
+      "runId": "30f52dc5ca6b5f16b069",
+      "host": "known-exact-moser-13",
+      "balanceScore": 0.77396826,
+      "recordStreak": 1
+    },
+    {
+      "n": 14,
+      "edges": 33,
+      "runId": "2ae96cd35aa16251258f",
+      "host": "known-exact-moser-14",
+      "balanceScore": 0.90675214,
+      "recordStreak": 1
+    },
+    {
+      "n": 15,
+      "edges": 37,
+      "runId": "4bd06b0790666e883765",
+      "host": "known-exact-moser-15",
+      "balanceScore": 0.76496033,
+      "recordStreak": 1
+    },
+    {
+      "n": 16,
+      "edges": 41,
+      "runId": "4d93e4285a801e743d7a",
+      "host": "known-exact-moser-16",
+      "balanceScore": 0.72930108,
+      "recordStreak": 1
+    },
+    {
+      "n": 17,
+      "edges": 43,
+      "runId": "9ed3a763c6fed82cce9e",
+      "host": "known-exact-moser-17",
+      "balanceScore": 0.70428181,
+      "recordStreak": 1
+    },
+    {
+      "n": 18,
+      "edges": 46,
+      "runId": "edd9d1976d32f0e3f93c",
+      "host": "known-exact-moser-18",
+      "balanceScore": 0.75324681,
+      "recordStreak": 1
+    },
+    {
+      "n": 19,
+      "edges": 50,
+      "runId": "36b85174998959dff859",
+      "host": "known-exact-moser-19",
+      "balanceScore": 0.68095537,
+      "recordStreak": 1
+    },
+    {
+      "n": 20,
+      "edges": 54,
+      "runId": "8a65ca1e68a136690085",
+      "host": "known-exact-moser-20",
+      "balanceScore": 0.63317031,
+      "recordStreak": 1
+    },
+    {
+      "n": 21,
+      "edges": 57,
+      "runId": "abfdda8f6e8fa1ca8698",
+      "host": "known-exact-moser-21",
+      "balanceScore": 0.6396097,
+      "recordStreak": 1
+    },
+    {
+      "n": 22,
+      "edges": 59,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.95478796,
+      "recordStreak": 4
+    },
+    {
+      "n": 23,
+      "edges": 63,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.92865117,
+      "recordStreak": 4
+    },
+    {
+      "n": 24,
+      "edges": 68,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87153513,
+      "recordStreak": 4
+    },
+    {
+      "n": 25,
+      "edges": 70,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86398542,
+      "recordStreak": 4
+    },
+    {
+      "n": 26,
+      "edges": 75,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.88036897,
+      "recordStreak": 16
+    },
+    {
+      "n": 27,
+      "edges": 81,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.93374228,
+      "recordStreak": 16
+    },
+    {
+      "n": 28,
+      "edges": 83,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.91355792,
+      "recordStreak": 16
+    },
+    {
+      "n": 29,
+      "edges": 86,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.89404614,
+      "recordStreak": 16
+    },
+    {
+      "n": 30,
+      "edges": 89,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.82753854,
+      "recordStreak": 16
+    },
+    {
+      "n": 31,
+      "edges": 93,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.82911336,
+      "recordStreak": 16
+    },
+    {
+      "n": 32,
+      "edges": 97,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.85215522,
+      "recordStreak": 16
+    },
+    {
+      "n": 33,
+      "edges": 102,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.85248507,
+      "recordStreak": 16
+    },
+    {
+      "n": 34,
+      "edges": 106,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.84956861,
+      "recordStreak": 16
+    },
+    {
+      "n": 35,
+      "edges": 111,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.84331223,
+      "recordStreak": 16
+    },
+    {
+      "n": 36,
+      "edges": 117,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.82201625,
+      "recordStreak": 16
+    },
+    {
+      "n": 37,
+      "edges": 119,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.81978493,
+      "recordStreak": 16
+    },
+    {
+      "n": 38,
+      "edges": 122,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.81760523,
+      "recordStreak": 16
+    },
+    {
+      "n": 39,
+      "edges": 126,
+      "runId": "f60e8b940488674e9257",
+      "host": "z18-3x3x3x2x3x2",
+      "balanceScore": 0.83593992,
+      "recordStreak": 16
+    },
+    {
+      "n": 40,
+      "edges": 129,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83648676,
+      "recordStreak": 2
+    },
+    {
+      "n": 41,
+      "edges": 134,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83867798,
+      "recordStreak": 2
+    },
+    {
+      "n": 42,
+      "edges": 139,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82734677,
+      "recordStreak": 19
+    },
+    {
+      "n": 43,
+      "edges": 144,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83246633,
+      "recordStreak": 19
+    },
+    {
+      "n": 44,
+      "edges": 149,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83034453,
+      "recordStreak": 19
+    },
+    {
+      "n": 45,
+      "edges": 153,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82297946,
+      "recordStreak": 19
+    },
+    {
+      "n": 46,
+      "edges": 158,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82417941,
+      "recordStreak": 19
+    },
+    {
+      "n": 47,
+      "edges": 162,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80749847,
+      "recordStreak": 19
+    },
+    {
+      "n": 48,
+      "edges": 167,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80324574,
+      "recordStreak": 19
+    },
+    {
+      "n": 49,
+      "edges": 171,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.806922,
+      "recordStreak": 19
+    },
+    {
+      "n": 50,
+      "edges": 176,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81055246,
+      "recordStreak": 19
+    },
+    {
+      "n": 51,
+      "edges": 181,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80147895,
+      "recordStreak": 19
+    },
+    {
+      "n": 52,
+      "edges": 186,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80966759,
+      "recordStreak": 19
+    },
+    {
+      "n": 53,
+      "edges": 190,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80825207,
+      "recordStreak": 19
+    },
+    {
+      "n": 54,
+      "edges": 195,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82194195,
+      "recordStreak": 19
+    },
+    {
+      "n": 55,
+      "edges": 200,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85208968,
+      "recordStreak": 19
+    },
+    {
+      "n": 56,
+      "edges": 205,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8348791,
+      "recordStreak": 19
+    },
+    {
+      "n": 57,
+      "edges": 209,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83758757,
+      "recordStreak": 19
+    },
+    {
+      "n": 58,
+      "edges": 214,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8337996,
+      "recordStreak": 19
+    },
+    {
+      "n": 59,
+      "edges": 219,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82071747,
+      "recordStreak": 20
+    },
+    {
+      "n": 60,
+      "edges": 224,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83331237,
+      "recordStreak": 20
+    },
+    {
+      "n": 61,
+      "edges": 230,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83562756,
+      "recordStreak": 20
+    },
+    {
+      "n": 62,
+      "edges": 234,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82817454,
+      "recordStreak": 20
+    },
+    {
+      "n": 63,
+      "edges": 239,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82702089,
+      "recordStreak": 20
+    },
+    {
+      "n": 64,
+      "edges": 244,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81329941,
+      "recordStreak": 20
+    },
+    {
+      "n": 65,
+      "edges": 250,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82707492,
+      "recordStreak": 20
+    },
+    {
+      "n": 66,
+      "edges": 254,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82858231,
+      "recordStreak": 20
+    },
+    {
+      "n": 67,
+      "edges": 259,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83455871,
+      "recordStreak": 20
+    },
+    {
+      "n": 68,
+      "edges": 264,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85307305,
+      "recordStreak": 20
+    },
+    {
+      "n": 69,
+      "edges": 270,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85094889,
+      "recordStreak": 20
+    },
+    {
+      "n": 70,
+      "edges": 276,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85076792,
+      "recordStreak": 20
+    },
+    {
+      "n": 71,
+      "edges": 280,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.88171764,
+      "recordStreak": 20
+    },
+    {
+      "n": 72,
+      "edges": 285,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86004596,
+      "recordStreak": 20
+    },
+    {
+      "n": 73,
+      "edges": 291,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.852579,
+      "recordStreak": 20
+    },
+    {
+      "n": 74,
+      "edges": 295,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85904768,
+      "recordStreak": 20
+    },
+    {
+      "n": 75,
+      "edges": 300,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.84913879,
+      "recordStreak": 20
+    },
+    {
+      "n": 76,
+      "edges": 305,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87326921,
+      "recordStreak": 20
+    },
+    {
+      "n": 77,
+      "edges": 311,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86801669,
+      "recordStreak": 20
+    },
+    {
+      "n": 78,
+      "edges": 316,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.91009212,
+      "recordStreak": 3
+    },
+    {
+      "n": 79,
+      "edges": 321,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.90997516,
+      "recordStreak": 3
+    },
+    {
+      "n": 80,
+      "edges": 325,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.90586287,
+      "recordStreak": 3
+    },
+    {
+      "n": 81,
+      "edges": 331,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87345994,
+      "recordStreak": 14
+    },
+    {
+      "n": 82,
+      "edges": 336,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87264016,
+      "recordStreak": 14
+    },
+    {
+      "n": 83,
+      "edges": 342,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85740773,
+      "recordStreak": 14
+    },
+    {
+      "n": 84,
+      "edges": 346,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83804689,
+      "recordStreak": 14
+    },
+    {
+      "n": 85,
+      "edges": 351,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81973749,
+      "recordStreak": 14
+    },
+    {
+      "n": 86,
+      "edges": 356,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80128756,
+      "recordStreak": 14
+    },
+    {
+      "n": 87,
+      "edges": 362,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.78668487,
+      "recordStreak": 14
+    },
+    {
+      "n": 88,
+      "edges": 367,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.78230886,
+      "recordStreak": 14
+    },
+    {
+      "n": 89,
+      "edges": 373,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79681931,
+      "recordStreak": 14
+    },
+    {
+      "n": 90,
+      "edges": 379,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79878,
+      "recordStreak": 14
+    },
+    {
+      "n": 91,
+      "edges": 383,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81369614,
+      "recordStreak": 14
+    },
+    {
+      "n": 92,
+      "edges": 388,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8244248,
+      "recordStreak": 14
+    },
+    {
+      "n": 93,
+      "edges": 394,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86716819,
+      "recordStreak": 5
+    },
+    {
+      "n": 94,
+      "edges": 401,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86226897,
+      "recordStreak": 5
+    },
+    {
+      "n": 95,
+      "edges": 406,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.854259,
+      "recordStreak": 5
+    },
+    {
+      "n": 96,
+      "edges": 411,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85216177,
+      "recordStreak": 5
+    },
+    {
+      "n": 97,
+      "edges": 416,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86747214,
+      "recordStreak": 14
+    },
+    {
+      "n": 98,
+      "edges": 421,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86176418,
+      "recordStreak": 14
+    },
+    {
+      "n": 99,
+      "edges": 427,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8647081,
+      "recordStreak": 14
+    },
+    {
+      "n": 100,
+      "edges": 432,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86154547,
+      "recordStreak": 14
+    },
+    {
+      "n": 101,
+      "edges": 438,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86169509,
+      "recordStreak": 14
+    },
+    {
+      "n": 102,
+      "edges": 443,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85921306,
+      "recordStreak": 14
+    },
+    {
+      "n": 103,
+      "edges": 448,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86718033,
+      "recordStreak": 14
+    },
+    {
+      "n": 104,
+      "edges": 453,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87033927,
+      "recordStreak": 14
+    },
+    {
+      "n": 105,
+      "edges": 459,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86971615,
+      "recordStreak": 14
+    },
+    {
+      "n": 106,
+      "edges": 465,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86889731,
+      "recordStreak": 14
+    },
+    {
+      "n": 107,
+      "edges": 469,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87126913,
+      "recordStreak": 14
+    },
+    {
+      "n": 108,
+      "edges": 474,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87581575,
+      "recordStreak": 14
+    },
+    {
+      "n": 109,
+      "edges": 480,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.87711875,
+      "recordStreak": 14
+    },
+    {
+      "n": 110,
+      "edges": 485,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.86653579,
+      "recordStreak": 14
+    },
+    {
+      "n": 111,
+      "edges": 491,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85254739,
+      "recordStreak": 38
+    },
+    {
+      "n": 112,
+      "edges": 498,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85395802,
+      "recordStreak": 38
+    },
+    {
+      "n": 113,
+      "edges": 504,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.85319365,
+      "recordStreak": 38
+    },
+    {
+      "n": 114,
+      "edges": 508,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.84693591,
+      "recordStreak": 38
+    },
+    {
+      "n": 115,
+      "edges": 513,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.84146466,
+      "recordStreak": 38
+    },
+    {
+      "n": 116,
+      "edges": 518,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83549861,
+      "recordStreak": 38
+    },
+    {
+      "n": 117,
+      "edges": 523,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82550341,
+      "recordStreak": 38
+    },
+    {
+      "n": 118,
+      "edges": 529,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81309546,
+      "recordStreak": 38
+    },
+    {
+      "n": 119,
+      "edges": 534,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81796716,
+      "recordStreak": 38
+    },
+    {
+      "n": 120,
+      "edges": 540,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81345223,
+      "recordStreak": 38
+    },
+    {
+      "n": 121,
+      "edges": 544,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81081855,
+      "recordStreak": 38
+    },
+    {
+      "n": 122,
+      "edges": 549,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80902681,
+      "recordStreak": 38
+    },
+    {
+      "n": 123,
+      "edges": 554,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80079184,
+      "recordStreak": 38
+    },
+    {
+      "n": 124,
+      "edges": 559,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80057789,
+      "recordStreak": 38
+    },
+    {
+      "n": 125,
+      "edges": 565,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80152215,
+      "recordStreak": 38
+    },
+    {
+      "n": 126,
+      "edges": 571,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80562469,
+      "recordStreak": 38
+    },
+    {
+      "n": 127,
+      "edges": 577,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82293662,
+      "recordStreak": 38
+    },
+    {
+      "n": 128,
+      "edges": 583,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82367897,
+      "recordStreak": 38
+    },
+    {
+      "n": 129,
+      "edges": 587,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81374766,
+      "recordStreak": 38
+    },
+    {
+      "n": 130,
+      "edges": 592,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81043766,
+      "recordStreak": 38
+    },
+    {
+      "n": 131,
+      "edges": 598,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81004276,
+      "recordStreak": 38
+    },
+    {
+      "n": 132,
+      "edges": 604,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80838501,
+      "recordStreak": 38
+    },
+    {
+      "n": 133,
+      "edges": 610,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8097199,
+      "recordStreak": 38
+    },
+    {
+      "n": 134,
+      "edges": 615,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80761672,
+      "recordStreak": 38
+    },
+    {
+      "n": 135,
+      "edges": 619,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81479431,
+      "recordStreak": 38
+    },
+    {
+      "n": 136,
+      "edges": 624,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81335608,
+      "recordStreak": 38
+    },
+    {
+      "n": 137,
+      "edges": 629,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81087846,
+      "recordStreak": 38
+    },
+    {
+      "n": 138,
+      "edges": 635,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80731912,
+      "recordStreak": 38
+    },
+    {
+      "n": 139,
+      "edges": 640,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81258106,
+      "recordStreak": 38
+    },
+    {
+      "n": 140,
+      "edges": 646,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80260045,
+      "recordStreak": 38
+    },
+    {
+      "n": 141,
+      "edges": 650,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80496312,
+      "recordStreak": 38
+    },
+    {
+      "n": 142,
+      "edges": 656,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81625903,
+      "recordStreak": 38
+    },
+    {
+      "n": 143,
+      "edges": 662,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81803777,
+      "recordStreak": 38
+    },
+    {
+      "n": 144,
+      "edges": 668,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82032664,
+      "recordStreak": 38
+    },
+    {
+      "n": 145,
+      "edges": 674,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82191168,
+      "recordStreak": 38
+    },
+    {
+      "n": 146,
+      "edges": 678,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81079496,
+      "recordStreak": 38
+    },
+    {
+      "n": 147,
+      "edges": 683,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80408819,
+      "recordStreak": 38
+    },
+    {
+      "n": 148,
+      "edges": 688,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79237428,
+      "recordStreak": 7
+    },
+    {
+      "n": 149,
+      "edges": 694,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79212841,
+      "recordStreak": 7
+    },
+    {
+      "n": 150,
+      "edges": 700,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79230719,
+      "recordStreak": 7
+    },
+    {
+      "n": 151,
+      "edges": 706,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79060124,
+      "recordStreak": 7
+    },
+    {
+      "n": 152,
+      "edges": 711,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79651541,
+      "recordStreak": 7
+    },
+    {
+      "n": 153,
+      "edges": 717,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79856047,
+      "recordStreak": 7
+    },
+    {
+      "n": 154,
+      "edges": 722,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.7992323,
+      "recordStreak": 7
+    },
+    {
+      "n": 155,
+      "edges": 728,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79477093,
+      "recordStreak": 6
+    },
+    {
+      "n": 156,
+      "edges": 734,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.7924765,
+      "recordStreak": 6
+    },
+    {
+      "n": 157,
+      "edges": 740,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.7953563,
+      "recordStreak": 4
+    },
+    {
+      "n": 158,
+      "edges": 746,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79616307,
+      "recordStreak": 4
+    },
+    {
+      "n": 159,
+      "edges": 751,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79941796,
+      "recordStreak": 4
+    },
+    {
+      "n": 160,
+      "edges": 757,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79990166,
+      "recordStreak": 4
+    },
+    {
+      "n": 161,
+      "edges": 762,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81089442,
+      "recordStreak": 2
+    },
+    {
+      "n": 162,
+      "edges": 767,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81382749,
+      "recordStreak": 2
+    },
+    {
+      "n": 163,
+      "edges": 773,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81254099,
+      "recordStreak": 4
+    },
+    {
+      "n": 164,
+      "edges": 778,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81707062,
+      "recordStreak": 7
+    },
+    {
+      "n": 165,
+      "edges": 784,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81852682,
+      "recordStreak": 7
+    },
+    {
+      "n": 166,
+      "edges": 790,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8214362,
+      "recordStreak": 7
+    },
+    {
+      "n": 167,
+      "edges": 795,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81538199,
+      "recordStreak": 7
+    },
+    {
+      "n": 168,
+      "edges": 801,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82795426,
+      "recordStreak": 7
+    },
+    {
+      "n": 169,
+      "edges": 806,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82696471,
+      "recordStreak": 7
+    },
+    {
+      "n": 170,
+      "edges": 811,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82365308,
+      "recordStreak": 7
+    },
+    {
+      "n": 171,
+      "edges": 817,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80270144,
+      "recordStreak": 2
+    },
+    {
+      "n": 172,
+      "edges": 822,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81121725,
+      "recordStreak": 2
+    },
+    {
+      "n": 173,
+      "edges": 827,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80837071,
+      "recordStreak": 7
+    },
+    {
+      "n": 174,
+      "edges": 833,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80208392,
+      "recordStreak": 7
+    },
+    {
+      "n": 175,
+      "edges": 839,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79449092,
+      "recordStreak": 7
+    },
+    {
+      "n": 176,
+      "edges": 845,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80053624,
+      "recordStreak": 7
+    },
+    {
+      "n": 177,
+      "edges": 850,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80193413,
+      "recordStreak": 7
+    },
+    {
+      "n": 178,
+      "edges": 854,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8057105,
+      "recordStreak": 7
+    },
+    {
+      "n": 179,
+      "edges": 859,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81926673,
+      "recordStreak": 6
+    },
+    {
+      "n": 180,
+      "edges": 865,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.82914733,
+      "recordStreak": 6
+    },
+    {
+      "n": 181,
+      "edges": 870,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83514352,
+      "recordStreak": 6
+    },
+    {
+      "n": 182,
+      "edges": 876,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83540748,
+      "recordStreak": 6
+    },
+    {
+      "n": 183,
+      "edges": 880,
+      "runId": "7794ee38da3f249cef09",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.840875,
+      "recordStreak": 6
+    },
+    {
+      "n": 184,
+      "edges": 886,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.80301481,
+      "recordStreak": 11
+    },
+    {
+      "n": 185,
+      "edges": 890,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79138653,
+      "recordStreak": 11
+    },
+    {
+      "n": 186,
+      "edges": 895,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79729814,
+      "recordStreak": 11
+    },
+    {
+      "n": 187,
+      "edges": 900,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79367614,
+      "recordStreak": 11
+    },
+    {
+      "n": 188,
+      "edges": 905,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.79885491,
+      "recordStreak": 11
+    },
+    {
+      "n": 189,
+      "edges": 910,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.78910304,
+      "recordStreak": 11
+    },
+    {
+      "n": 190,
+      "edges": 916,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.78758859,
+      "recordStreak": 11
+    },
+    {
+      "n": 191,
+      "edges": 921,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.78237128,
+      "recordStreak": 11
+    },
+    {
+      "n": 192,
+      "edges": 926,
+      "runId": "c039d311e14b328db720",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.7813783,
+      "recordStreak": 11
+    },
+    {
+      "n": 193,
+      "edges": 929,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81242612,
+      "recordStreak": 7
+    },
+    {
+      "n": 194,
+      "edges": 935,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81404825,
+      "recordStreak": 7
+    },
+    {
+      "n": 195,
+      "edges": 941,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.81530026,
+      "recordStreak": 7
+    },
+    {
+      "n": 196,
+      "edges": 945,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.83606474,
+      "recordStreak": 7
+    },
+    {
+      "n": 197,
+      "edges": 950,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.84314469,
+      "recordStreak": 7
+    },
+    {
+      "n": 198,
+      "edges": 955,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.84760667,
+      "recordStreak": 7
+    },
+    {
+      "n": 199,
+      "edges": 961,
+      "runId": "7bfb26c9b0910cf4a762",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.8511216,
+      "recordStreak": 7
+    },
+    {
+      "n": 200,
+      "edges": 966,
+      "runId": "397cac3496e2758117b7",
+      "host": "moser-5x4x4x4",
+      "balanceScore": 0.78056045,
+      "recordStreak": 0
+    }
+  ]
+}

@@ -1,42 +1,47 @@
 #!/usr/bin/env python3
-"""Serve the atlas locally so browser fetch() calls work."""
+"""Serve the atlas locally with caching disabled during iteration."""
 
 from __future__ import annotations
 
 import argparse
 import functools
 import http.server
-import socket
+import threading
 import webbrowser
 from pathlib import Path
 
 
-class AtlasHandler(http.server.SimpleHTTPRequestHandler):
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self) -> None:
-        # The generator is commonly rerun while the browser remains open.
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Pragma", "no-cache")
         super().end_headers()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--open", action="store_true", help="open the atlas in the default browser")
+    parser.add_argument("--open", action="store_true", help="open the browser after the server starts")
+    parser.add_argument(
+        "--directory",
+        type=Path,
+        default=Path(__file__).resolve().parent,
+        help="directory to serve (default: this project)",
+    )
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parent
-    handler = functools.partial(AtlasHandler, directory=str(root))
+    directory = args.directory.resolve()
+    handler = functools.partial(NoCacheHandler, directory=str(directory))
     server = http.server.ThreadingHTTPServer((args.host, args.port), handler)
-    address = f"http://{args.host}:{server.server_port}/"
-    print(f"Serving {root}")
-    print(address)
+    url = f"http://{args.host}:{args.port}/"
+    print(f"Serving {directory}\n{url}")
     if args.open:
-        webbrowser.open(address)
+        threading.Timer(0.35, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopped.")
+        print("\nStopping.")
     finally:
         server.server_close()
 

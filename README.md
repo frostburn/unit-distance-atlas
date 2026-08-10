@@ -1,123 +1,244 @@
-# Unit-distance graph atlas
+# Unit-distance motion atlas
 
-A local, static atlas for dense planar unit-distance graphs.
+A JSON-only search pipeline and transparent Canvas frontend for exploring a
+strict-record sequence of planar unit-distance graphs. No SVG files are emitted
+or loaded. The browser turns exact graph coordinates and edge tables into a
+continuously styled, animated scene.
 
-The Python generator searches exact cyclotomic host graphs, keeps the best result seen for each `n`, and writes:
+The supplied project contains a demonstration atlas through `n = 200`. The
+same generator supports `n = 2000`.
 
-```text
-data/
-  catalog.json          lightweight index used by the chart
-  catalog.local.json    ignored index written by local generation
-  graphs/0001.svg       transparent, title-free SVG artwork
-  records/0001.json     caption, provenance, vertex table, and edge table
-```
+## What “strict” means
 
-Filenames always use four digits because the supported range is `1 … 9999`.
+At every point count, the selected frame has the greatest edge count present in
+the atlas search state. Temporal smoothness, host continuity, and visual balance
+are used **only to choose among candidates tied at that edge count**. The
+sequence optimizer is never allowed to trade away an edge for a prettier
+transition.
 
-## Install and generate
+The values through `n = 21` are supplied by known exact constructions and are
+marked **proven optimal**. Larger frames are marked **strict atlas record**:
+they are the best counts found by the current archived runs, not a claim of a
+global proof.
 
-Only the generator has a third-party dependency:
-
-```bash
-python -m pip install sympy
-python generate.py --max-n 200 --restarts 8
-```
-
-This searches every size from 1 through 200. A restart produces one nested family, so a single search pass contributes candidates for every `n`, rather than running 200 unrelated searches.
-
-Generation writes its index to the Git-ignored `data/catalog.local.json`, using
-that file on later runs and falling back to the published `data/catalog.json`
-on the first run. Generated graph and record files above 120 points are also
-ignored so local experiments do not expand the checked-in atlas accidentally.
-When a search improves any record from 1 through 120, the generator also
-refreshes the version-controlled `data/catalog.json`, restricted to that
-published range. Searches that only affect larger graphs leave it untouched.
-
-Available exact host families are:
-
-```text
-hex, z12, z18, z24, z30, binary
-```
-
-The default portfolio is `hex,z12,z18,z24,binary`. A larger run can be launched with:
+## Quick start
 
 ```bash
-python generate.py --max-n 9999 --restarts 16 --hosts all
-```
-
-A complete 9999-record atlas is inherently large: every SVG repeats its own vertices and edges, and every JSON record contains its own geometry table. Expect substantial runtime and disk use. Generate a smaller prefix first to check the presentation and search settings.
-
-## Improve existing records
-
-Rerun the same command with more restarts or another seed:
-
-```bash
-python generate.py --max-n 200 --restarts 64 --seed 20260809
-```
-
-For each `n`, the generator reads the existing edge count and replaces `NNNN.svg` and `NNNN.json` only when the new candidate has **strictly more edges**. Ties leave the existing files untouched.
-
-To concentrate on a suffix while preserving smaller records:
-
-```bash
-python generate.py --min-n 500 --max-n 1000 --restarts 64
-```
-
-Per-record JSON is compact by default. Add `--pretty-json` when human-readable indentation matters more than disk space.
-
-## Open the frontend
-
-Browser security normally blocks `fetch()` from `file://` pages, so use the included tiny server:
-
-```bash
+python -m pip install -r requirements.txt
 python serve.py --open
 ```
 
-Or:
+Use an HTTP server rather than opening `index.html` as a `file:` URL, because
+the frontend loads JSON with `fetch()`.
+
+To create a fresh small atlas:
 
 ```bash
-python -m http.server 8000
+python generate.py \
+  --max-n 200 \
+  --restarts 8 \
+  --seed 1 \
+  --reset-search-state \
+  --publish
 ```
 
-Then open `http://127.0.0.1:8000/`.
+To search through the intended target:
 
-The frontend provides:
+```bash
+python generate.py \
+  --max-n 2000 \
+  --restarts 16 \
+  --seed 1 \
+  --publish
+```
 
-- dark mode by default and a light/dark toggle
-- previous/next buttons, point-count input, and left/right arrow keys
-- a hover-preview chart; clicking a chart position selects that graph
-- wheel zoom around the pointer
-- drag panning
-- pinch zoom and two-finger panning on touch devices
-- direct links to the selected SVG and metadata JSON
+A stronger incremental pass can reuse the saved lineages:
 
-## Record schema
+```bash
+python generate.py \
+  --max-n 2000 \
+  --restarts 64 \
+  --seed 1 \
+  --publish
+```
 
-Each `data/records/NNNN.json` contains summary fields plus:
+Using the same seed with a larger restart count reproduces the old run seeds
+and adds the new ones. Existing record counts are floors: later searches cannot
+replace a record with a lower edge count. Tied candidates may still change the
+chosen movie sequence when they improve continuity or balance.
+
+Use a different seed to add an independent batch:
+
+```bash
+python generate.py --max-n 2000 --restarts 32 --seed 20260810 --publish
+```
+
+## Browser controls
+
+- **Play/Pause**, Previous, Next, direct point-count input, timeline scrubbing,
+  and `0.5×` to `3×` playback speed.
+- **Dark/light mode** changes the page behind the transparent Canvas.
+- **Mouse wheel** zooms around the pointer; dragging pans; Reset restores the
+  automatic framing.
+- **Pinch zoom and two-finger pan** work on touch devices.
+- **Left/Right arrows** step, **Space** plays or pauses, and **0** resets the
+  camera.
+- Hovering over the record chart loads and renders a live Canvas miniature;
+  clicking the chart animates to that frame.
+
+## Animation model
+
+Every record after the first contains a `transition` object.
+
+### Growth / cell division
+
+When the strict record for `n + 1` contains the selected `n` graph:
+
+1. old vertices keep their persistent identities and exact positions;
+2. the newborn starts at the centroid of its final neighbours;
+3. it follows a lightly overshooting spring to its exact unit-distance
+   position;
+4. its incident edges grow in while neighbour cells pulse.
+
+The old edge set remains visible throughout.
+
+### Transmutation
+
+When strict records cannot be related by one added vertex:
+
+1. the old edges fade completely;
+2. cells migrate along gently curved paths using the stored old-to-new mapping;
+3. the extra cell appears during migration;
+4. only near the end do the new record edges fade in.
+
+Thus a host change reads as a deliberate reorganization rather than as a jump
+or a false implication that the new graph contains the old one.
+
+The generator aligns each new drawing with the previous frame before writing
+JSON. Exact translations are used when possible. Otherwise, rotations,
+reflections, and a spatial cell assignment are searched to reduce motion.
+
+## Continuous visual scaling
+
+The frontend has no visual breakpoints based on graph size. Node radius, edge
+width, edge opacity, outline width, halo size, and glow are smooth functions of
+`log(1 + n)`. This keeps early frames bold while preventing a 2,000-node frame
+from becoming an opaque blob, without a visible style switch at an arbitrary
+point count.
+
+Camera framing also interpolates continuously between source and target bounds.
+User pan and zoom are applied on top of that automatic camera.
+
+## Search pipeline
+
+The search operates in exact algebraic host graphs:
+
+- triangular/hexagonal lattice;
+- the rank-four Moser lattice with its 18 exact unit vectors;
+- cyclotomic boxes for orders 12, 18, 24, 30, and 36;
+- binary sections of cyclotomic orders 36 and 60.
+
+A randomized low-degree peeling pass yields a complete nested lineage from one
+host. Peeling includes a compactness bias, and each prefix receives a continuous
+balance score based on isotropy, centering, and degree regularity.
+
+For every `n`, the generator retains several tied best-count candidates. A
+global dynamic-programming pass then chooses the strict-record movie path
+lexicographically by:
+
+1. number of genuine one-cell growth transitions;
+2. number of adjacent frames in the same host family;
+3. accumulated visual-balance score;
+4. accumulated record streak length.
+
+This is deliberately different from independently choosing the prettiest frame
+at every `n`.
+
+Useful options:
+
+```text
+--hosts hex,moser,z12,z18,z24,z30,z36,binary
+--ties-per-n 12
+--compactness-bias 0.30
+--pretty-json
+--include-integer-coordinates
+--keep-all-runs
+--reset-search-state
+--publish
+```
+
+`--ties-per-n` controls how much freedom the sequence optimizer has. Larger
+values use more disk and memory but can find smoother strict-record paths.
+
+## Data layout
+
+```text
+data/
+  catalog.json             published/default frontend catalog
+  catalog.local.json       latest local catalog, preferred by the frontend
+  sequence.json            selected strict-record lineage and diagnostics
+  records/
+    0001.json
+    0002.json
+    ...
+    2000.json
+  search/
+    runs/                   reusable compact peeling lineages
+```
+
+There is intentionally no `data/graphs/` directory. A one-restart full-range
+verification through `n = 2000` occupied about 176 MB uncompressed; repeated
+coordinates and edge tables dominate that size. The browser lazy-loads records
+and keeps only a 24-record LRU window, so playing the complete sequence does not
+retain the entire atlas in memory.
+
+A record contains:
 
 ```json
 {
-  "host": {
-    "cyclotomicOrder": 24,
-    "basisDimension": 8
-  },
-  "search": {
-    "restart": 3,
-    "runSeed": 194818,
-    "choicePool": 12,
-    "degreeSlack": 1
+  "n": 1178,
+  "edges": 0,
+  "host": { "family": "moser" },
+  "transition": {
+    "kind": "growth",
+    "oldToNew": [0, 1, 2],
+    "addedVertex": 1177,
+    "spawn": [0.0, 0.0],
+    "spawnNeighbors": [12, 47, 301]
   },
   "geometry": {
-    "vertexTable": {
-      "columns": ["id", "c0", "...", "x", "y"],
-      "rows": []
-    },
-    "edgeTable": {
-      "columns": ["source", "target"],
-      "rows": []
-    }
+    "coordinates": [[0.0, 0.0]],
+    "edges": [0, 1, 1, 2],
+    "bounds": [0.0, 0.0, 1.0, 1.0]
   }
 }
 ```
 
-The coefficient columns describe exact cyclotomic integers. The `x,y` columns are numerical values of the selected complex embedding and are used only for display.
+The example values above illustrate the schema rather than an actual record.
+Edges are flattened pairs to reduce JSON overhead. Integer host coordinates are
+omitted by default because the frontend does not need them; enable them with
+`--include-integer-coordinates` for mathematical inspection.
+
+## Repository workflow
+
+A practical split is:
+
+- commit `index.html`, `app.js`, `styles.css`, `generate.py`,
+  `known_optima.py`, and `data/catalog.json`;
+- decide how much generated `data/records/` belongs in the published site;
+- normally keep `data/catalog.local.json` and `data/search/runs/` as local or
+  large-file build state.
+
+The frontend first tries `catalog.local.json`, then falls back to
+`catalog.json`. `--publish` updates both.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+node --check app.js
+```
+
+The tests verify the exact small counts, numerical unit lengths, flattened edge
+counts, transition mappings, retained edges in growth steps, absence of SVG
+output, and non-regression under incremental search.

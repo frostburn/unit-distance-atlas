@@ -4,110 +4,50 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>Unit-distance graph atlas</title>
+  <meta name="theme-color" content="#060910">
+  <title>Unit-distance motion atlas</title>
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
 <body data-theme="dark">
   <header class="toolbar">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">◇</span>
-      <div>
-        <h1>Unit-distance atlas</h1>
-        <p>Best graph found for each point count</p>
-      </div>
-    </div>
-
-    <div class="toolbar-actions" aria-label="Graph navigation">
-      <button id="previousButton" class="button" type="button" title="Previous graph (←)">
-        <span aria-hidden="true">←</span>
-        <span class="button-label">Previous</span>
-      </button>
-
-      <label class="number-field" for="nInput">
-        <span>Points</span>
-        <input id="nInput" type="number" min="1" max="9999" step="1" inputmode="numeric">
-      </label>
-
-      <button id="nextButton" class="button" type="button" title="Next graph (→)">
-        <span class="button-label">Next</span>
-        <span aria-hidden="true">→</span>
-      </button>
-
-      <button id="themeButton" class="button icon-button" type="button" title="Switch to light mode" aria-label="Switch to light mode">
-        <span id="themeIcon" aria-hidden="true">☀</span>
-      </button>
+    <a class="brand" href="#" aria-label="Unit-distance motion atlas">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><strong>Unit-distance motion atlas</strong><small>Strict records, continuous lineages</small></span>
+    </a>
+    <div class="toolbar-actions" aria-label="Animation and graph navigation">
+      <button id="previousButton" class="button icon-button" type="button" title="Previous graph (Left arrow)" aria-label="Previous graph">←</button>
+      <button id="playButton" class="button play-button" type="button" title="Play or pause (Space)"><span id="playIcon" aria-hidden="true">▶</span><span id="playLabel">Play</span></button>
+      <button id="nextButton" class="button icon-button" type="button" title="Next graph (Right arrow)" aria-label="Next graph">→</button>
+      <label class="number-field" for="nInput"><span>Points</span><input id="nInput" type="number" min="1" max="2000" step="1" inputmode="numeric"></label>
+      <label class="speed-field" for="speedSelect"><span>Speed</span><select id="speedSelect"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select></label>
+      <button id="themeButton" class="button icon-button" type="button" title="Switch theme" aria-label="Switch theme"><span id="themeIcon" aria-hidden="true">☀</span></button>
     </div>
   </header>
 
   <main class="page-shell">
     <section class="card stage-card" aria-labelledby="graphTitle">
-      <div id="stage" class="stage" tabindex="0" aria-label="Unit-distance graph. Drag to pan; use the mouse wheel or a pinch gesture to zoom.">
-        <div id="artworkLayer" class="artwork-layer" aria-live="polite"></div>
-        <div id="stageMessage" class="stage-message">Loading graph atlas…</div>
-
-        <div class="zoom-controls" aria-label="Zoom controls">
-          <button id="zoomOutButton" class="small-button" type="button" title="Zoom out" aria-label="Zoom out">−</button>
-          <button id="resetZoomButton" class="small-button reset-button" type="button" title="Reset zoom">Reset</button>
-          <button id="zoomInButton" class="small-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
-        </div>
+      <div id="stage" class="stage" tabindex="0" aria-label="Animated unit-distance graph. Drag to pan; use the mouse wheel or pinch to zoom.">
+        <canvas id="graphCanvas"></canvas>
+        <div class="stage-vignette" aria-hidden="true"></div>
+        <div id="stageMessage" class="stage-message">Loading the motion atlas…</div>
+        <div class="stage-hud" aria-hidden="true"><span id="hudN">n = —</span><span class="hud-separator">/</span><span id="hudEdges">— edges</span><span id="transitionBadge" class="transition-badge">still</span></div>
+        <div class="zoom-controls" aria-label="Zoom controls"><button id="zoomOutButton" class="small-button" type="button" title="Zoom out" aria-label="Zoom out">−</button><button id="resetZoomButton" class="small-button reset-button" type="button" title="Reset pan and zoom">Reset</button><button id="zoomInButton" class="small-button" type="button" title="Zoom in" aria-label="Zoom in">+</button></div>
       </div>
-
+      <div class="transport-strip"><span id="rangeStart" class="range-number">1</span><input id="timeline" type="range" min="1" max="1" value="1" step="1" aria-label="Point count timeline"><span id="rangeEnd" class="range-number">—</span></div>
       <div class="record-caption">
-        <div class="record-heading">
-          <div>
-            <p id="recordKicker" class="kicker">Record</p>
-            <h2 id="graphTitle">—</h2>
-          </div>
-          <div class="record-links">
-            <a id="svgLink" class="text-link" href="#" target="_blank" rel="noopener">SVG</a>
-            <a id="metadataLink" class="text-link" href="#" target="_blank" rel="noopener">JSON metadata</a>
-          </div>
-        </div>
-
-        <dl class="stats-grid">
-          <div>
-            <dt>Unit distances</dt>
-            <dd id="edgeCount">—</dd>
-          </div>
-          <div>
-            <dt>Average degree</dt>
-            <dd id="averageDegree">—</dd>
-          </div>
-          <div>
-            <dt>Host</dt>
-            <dd id="hostName">—</dd>
-          </div>
-          <div>
-            <dt>Search run</dt>
-            <dd id="searchRun">—</dd>
-          </div>
-        </dl>
+        <div class="record-heading"><div><p id="recordKicker" class="kicker">Strict atlas record</p><h1 id="graphTitle">—</h1></div><a id="metadataLink" class="text-link" href="#" target="_blank" rel="noopener">Open JSON</a></div>
+        <dl class="stats-grid"><div><dt>Unit distances</dt><dd id="edgeCount">—</dd></div><div><dt>Average degree</dt><dd id="averageDegree">—</dd></div><div><dt>Host</dt><dd id="hostName">—</dd></div><div><dt>Arrival</dt><dd id="arrivalType">—</dd></div></dl>
       </div>
     </section>
 
     <section class="card chart-card" aria-labelledby="chartTitle">
-      <div class="section-heading">
-        <div>
-          <p class="kicker">Atlas overview</p>
-          <h2 id="chartTitle">Edges found by point count</h2>
-        </div>
-        <p class="section-help">Hover for a preview; click to put that graph on the main stage.</p>
-      </div>
-
-      <div id="chartWrap" class="chart-wrap">
-        <canvas id="recordChart" aria-label="Chart of points against unit-distance edges"></canvas>
-        <div id="chartTooltip" class="chart-tooltip" hidden>
-          <div id="tooltipPreview" class="tooltip-preview"></div>
-          <div class="tooltip-copy">
-            <strong id="tooltipTitle">—</strong>
-            <span id="tooltipSubtitle">—</span>
-          </div>
-        </div>
-      </div>
+      <div class="section-heading"><div><p class="kicker">Sequence overview</p><h2 id="chartTitle">Record edges by point count</h2></div><p>Hover to inspect a dynamically rendered miniature. Click to transmute to that record.</p></div>
+      <div id="chartWrap" class="chart-wrap"><canvas id="recordChart" aria-label="Chart of point count against record unit-distance edges"></canvas><div id="chartTooltip" class="chart-tooltip" hidden><canvas id="tooltipCanvas" width="220" height="150"></canvas><div class="tooltip-copy"><strong id="tooltipTitle">—</strong><span id="tooltipSubtitle">—</span></div></div></div>
     </section>
-  </main>
 
+    <footer class="page-footer"><span>Canvas is transparent; the surrounding theme supplies the background.</span><span>Space: play · ←/→: step · wheel/pinch: zoom · drag: pan</span></footer>
+  </main>
   <noscript>This frontend requires JavaScript.</noscript>
 </body>
 </html>

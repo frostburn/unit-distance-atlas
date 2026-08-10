@@ -1,738 +1,1077 @@
 (() => {
   "use strict";
 
+  const $ = (selector) => document.querySelector(selector);
   const elements = {
     body: document.body,
-    previousButton: document.querySelector("#previousButton"),
-    nextButton: document.querySelector("#nextButton"),
-    nInput: document.querySelector("#nInput"),
-    themeButton: document.querySelector("#themeButton"),
-    themeIcon: document.querySelector("#themeIcon"),
-    stage: document.querySelector("#stage"),
-    artworkLayer: document.querySelector("#artworkLayer"),
-    stageMessage: document.querySelector("#stageMessage"),
-    zoomOutButton: document.querySelector("#zoomOutButton"),
-    resetZoomButton: document.querySelector("#resetZoomButton"),
-    zoomInButton: document.querySelector("#zoomInButton"),
-    recordKicker: document.querySelector("#recordKicker"),
-    graphTitle: document.querySelector("#graphTitle"),
-    edgeCount: document.querySelector("#edgeCount"),
-    averageDegree: document.querySelector("#averageDegree"),
-    hostName: document.querySelector("#hostName"),
-    searchRun: document.querySelector("#searchRun"),
-    svgLink: document.querySelector("#svgLink"),
-    metadataLink: document.querySelector("#metadataLink"),
-    chartWrap: document.querySelector("#chartWrap"),
-    chart: document.querySelector("#recordChart"),
-    chartTooltip: document.querySelector("#chartTooltip"),
-    tooltipPreview: document.querySelector("#tooltipPreview"),
-    tooltipTitle: document.querySelector("#tooltipTitle"),
-    tooltipSubtitle: document.querySelector("#tooltipSubtitle"),
+    previousButton: $("#previousButton"),
+    playButton: $("#playButton"),
+    playIcon: $("#playIcon"),
+    playLabel: $("#playLabel"),
+    nextButton: $("#nextButton"),
+    nInput: $("#nInput"),
+    speedSelect: $("#speedSelect"),
+    themeButton: $("#themeButton"),
+    themeIcon: $("#themeIcon"),
+    stage: $("#stage"),
+    graphCanvas: $("#graphCanvas"),
+    stageMessage: $("#stageMessage"),
+    hudN: $("#hudN"),
+    hudEdges: $("#hudEdges"),
+    transitionBadge: $("#transitionBadge"),
+    zoomOutButton: $("#zoomOutButton"),
+    resetZoomButton: $("#resetZoomButton"),
+    zoomInButton: $("#zoomInButton"),
+    timeline: $("#timeline"),
+    rangeStart: $("#rangeStart"),
+    rangeEnd: $("#rangeEnd"),
+    recordKicker: $("#recordKicker"),
+    graphTitle: $("#graphTitle"),
+    metadataLink: $("#metadataLink"),
+    edgeCount: $("#edgeCount"),
+    averageDegree: $("#averageDegree"),
+    hostName: $("#hostName"),
+    arrivalType: $("#arrivalType"),
+    chartWrap: $("#chartWrap"),
+    recordChart: $("#recordChart"),
+    chartTooltip: $("#chartTooltip"),
+    tooltipCanvas: $("#tooltipCanvas"),
+    tooltipTitle: $("#tooltipTitle"),
+    tooltipSubtitle: $("#tooltipSubtitle"),
   };
 
-  const state = {
-    records: [],
-    selectedIndex: -1,
-    hoverIndex: -1,
-    tooltipRecordIndex: -1,
-    chartMetrics: null,
-    svgCache: new Map(),
-    metadataCache: new Map(),
-    selectionToken: 0,
-    tooltipToken: 0,
-    theme: "dark",
-  };
-
-  const view = {
-    scale: 1,
-    x: 0,
-    y: 0,
-    artworkBounds: null,
-    pointers: new Map(),
-    gesture: null,
-  };
-
-  const integerFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-  const decimalFormatter = new Intl.NumberFormat(undefined, {
+  const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  const decimalFormat = new Intl.NumberFormat(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 3,
   });
 
-  function showStageMessage(message) {
+  const MAX_RECORD_CACHE = 24;
+
+  const state = {
+    catalog: null,
+    summaries: [],
+    records: new Map(),
+    currentIndex: -1,
+    currentRecord: null,
+    animation: null,
+    navigationToken: 0,
+    playing: false,
+    playDueAt: 0,
+    speed: 1,
+    frameHandle: 0,
+    lastFrame: 0,
+    hoverIndex: -1,
+    tooltipToken: 0,
+    chartMetrics: null,
+    prefersReducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+  };
+
+  const view = {
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    pointers: new Map(),
+    gesture: null,
+  };
+
+  function clamp(minimum, value, maximum) {
+    return Math.max(minimum, Math.min(maximum, value));
+  }
+
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function smoothstep(a, b, x) {
+    if (a === b) return x >= b ? 1 : 0;
+    const t = clamp(0, (x - a) / (b - a), 1);
+    return t * t * (3 - 2 * t);
+  }
+
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function spring(t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    return 1 - Math.pow(1 - t, 3) * Math.cos(3.5 * Math.PI * t);
+  }
+
+  function showMessage(message) {
     elements.stageMessage.textContent = message;
     elements.stageMessage.hidden = false;
   }
 
-  function hideStageMessage() {
+  function hideMessage() {
     elements.stageMessage.hidden = true;
   }
 
-  async function fetchText(url, cache) {
-    if (!cache.has(url)) {
-      const request = fetch(url, { cache: "no-store" }).then((response) => {
-        if (!response.ok) {
-          throw new Error(`${response.status} ${response.statusText}: ${url}`);
-        }
-        return response.text();
+  async function fetchJson(url) {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${url}`);
+    return response.json();
+  }
+
+  function normalizeRecord(raw) {
+    const coordinates = new Float64Array(raw.n * 2);
+    raw.geometry.coordinates.forEach((point, index) => {
+      coordinates[2 * index] = Number(point[0]);
+      coordinates[2 * index + 1] = Number(point[1]);
+    });
+    const edges = Uint32Array.from(raw.geometry.edges);
+    return {
+      ...raw,
+      coordinates,
+      edgeIndices: edges,
+      bounds: raw.geometry.bounds.map(Number),
+    };
+  }
+
+  function trimRecordCache() {
+    while (state.records.size > MAX_RECORD_CACHE) {
+      const oldest = state.records.keys().next().value;
+      state.records.delete(oldest);
+    }
+  }
+
+  function loadRecord(index) {
+    const summary = state.summaries[index];
+    if (!summary) return Promise.reject(new Error(`No record at index ${index}`));
+    const key = summary.record;
+    if (state.records.has(key)) {
+      const cached = state.records.get(key);
+      // Map insertion order doubles as a tiny LRU, keeping long playback bounded.
+      state.records.delete(key);
+      state.records.set(key, cached);
+      return cached;
+    }
+    const promise = fetchJson(key)
+      .then(normalizeRecord)
+      .catch((error) => {
+        state.records.delete(key);
+        throw error;
       });
-      cache.set(url, request);
-      request.catch(() => cache.delete(url));
-    }
-    return cache.get(url);
+    state.records.set(key, promise);
+    trimRecordCache();
+    return promise;
   }
 
-  async function fetchMetadata(url) {
-    if (!state.metadataCache.has(url)) {
-      const request = fetch(url, { cache: "no-store" }).then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`${response.status} ${response.statusText}: ${url}`);
-        }
-        return response.json();
-      });
-      state.metadataCache.set(url, request);
-      request.catch(() => state.metadataCache.delete(url));
-    }
-    return state.metadataCache.get(url);
+  function cssColor(name, fallback) {
+    return getComputedStyle(elements.body).getPropertyValue(name).trim() || fallback;
   }
 
-  function parseSvg(text) {
-    const documentNode = new DOMParser().parseFromString(text, "image/svg+xml");
-    if (documentNode.querySelector("parsererror")) {
-      throw new Error("Generated SVG could not be parsed");
-    }
-    const svg = documentNode.documentElement;
-    if (svg.localName !== "svg") {
-      throw new Error("Expected an SVG document");
-    }
-    svg.removeAttribute("width");
-    svg.removeAttribute("height");
-    svg.setAttribute("focusable", "false");
-    return document.importNode(svg, true);
+  function visualStyle(n, averageDegree = 0) {
+    // Every property is continuous in n; there are deliberately no size breakpoints.
+    const progress = clamp(0, Math.log1p(Math.max(1, n)) / Math.log(2001), 1);
+    const density = clamp(0, averageDegree / 18, 1);
+    return {
+      nodeRadius: lerp(7.4, 1.72, Math.pow(progress, 0.78)),
+      outlineWidth: lerp(1.15, 0.34, Math.pow(progress, 0.72)),
+      edgeWidth: lerp(2.25, 0.58, Math.pow(progress, 0.82)),
+      edgeAlpha: lerp(0.58, 0.20, Math.pow(progress, 0.72)) * lerp(1, 0.82, density),
+      nodeAlpha: lerp(1, 0.88, Math.pow(progress, 1.3)),
+      glowBlur: lerp(18, 0.7, Math.pow(progress, 0.55)),
+      glowAlpha: lerp(0.38, 0.035, Math.pow(progress, 0.62)),
+      haloRadius: lerp(25, 7, Math.pow(progress, 0.74)),
+    };
   }
 
-  function putSvg(container, text) {
-    container.replaceChildren(parseSvg(text));
-    if (container === elements.artworkLayer) {
-      view.artworkBounds = null;
-      applyViewTransform();
+  function fitBounds(bounds, width, height) {
+    const xmin = bounds[0];
+    const ymin = bounds[1];
+    const xmax = bounds[2];
+    const ymax = bounds[3];
+    const spanX = Math.max(0, xmax - xmin);
+    const spanY = Math.max(0, ymax - ymin);
+    const span = Math.max(spanX, spanY, 1);
+    const padding = clamp(34, Math.min(width, height) * 0.105, 110);
+    const usableWidth = Math.max(1, width - 2 * padding);
+    const usableHeight = Math.max(1, height - 2 * padding);
+    let scale;
+    if (spanX < 1e-10 && spanY < 1e-10) {
+      scale = Math.min(width, height) * 0.19;
+    } else {
+      scale = Math.min(usableWidth / Math.max(spanX, 0.55 * span), usableHeight / Math.max(spanY, 0.55 * span));
     }
+    return {
+      centerX: (xmin + xmax) / 2,
+      centerY: (ymin + ymax) / 2,
+      scale,
+    };
   }
 
-  function nearestRecordIndex(targetN) {
-    const records = state.records;
-    if (!records.length) return -1;
-    if (targetN <= records[0].n) return 0;
-    if (targetN >= records[records.length - 1].n) return records.length - 1;
+  function interpolateBounds(a, b, t) {
+    if (!a) return b.slice();
+    if (!b) return a.slice();
+    return a.map((value, index) => lerp(value, b[index], t));
+  }
 
-    let low = 0;
-    let high = records.length - 1;
-    while (low + 1 < high) {
-      const middle = (low + high) >> 1;
-      if (records[middle].n < targetN) low = middle;
-      else high = middle;
+  function resizeCanvas(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(devicePixelRatio || 1, 2.5);
+    const width = Math.max(1, Math.round(rect.width * dpr));
+    const height = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
     }
-    return targetN - records[low].n <= records[high].n - targetN ? low : high;
+    return { width: rect.width, height: rect.height, dpr };
   }
 
-  function updateNavigation() {
-    const index = state.selectedIndex;
-    elements.previousButton.disabled = index <= 0;
-    elements.nextButton.disabled = index < 0 || index >= state.records.length - 1;
-    if (index >= 0) {
-      elements.nInput.value = String(state.records[index].n);
+  function toScreenPositions(worldPositions, camera, width, height) {
+    const result = new Float64Array(worldPositions.length);
+    const scale = camera.scale * view.zoom;
+    const offsetX = width / 2 + view.panX - camera.centerX * scale;
+    const offsetY = height / 2 + view.panY + camera.centerY * scale;
+    for (let i = 0; i < worldPositions.length; i += 2) {
+      result[i] = worldPositions[i] * scale + offsetX;
+      result[i + 1] = -worldPositions[i + 1] * scale + offsetY;
     }
+    return result;
   }
 
-  function updateCaption(record, metadata) {
-    elements.recordKicker.textContent = `Record ${state.selectedIndex + 1} of ${state.records.length}`;
-    elements.graphTitle.textContent = `${integerFormatter.format(record.n)} points`;
-    elements.edgeCount.textContent = integerFormatter.format(metadata.edges);
-    elements.averageDegree.textContent = decimalFormatter.format(metadata.averageDegree);
-    elements.hostName.textContent = metadata.host?.label ?? record.host ?? "—";
-
-    const search = metadata.search ?? {};
-    const restart = search.restart ?? "?";
-    const total = search.restartsInBatch ?? "?";
-    const seed = search.runSeed ?? "?";
-    elements.searchRun.textContent = `restart ${restart}/${total} · seed ${seed}`;
-
-    elements.svgLink.href = record.svg;
-    elements.metadataLink.href = record.metadata;
-    elements.svgLink.setAttribute("download", `${String(record.n).padStart(4, "0")}.svg`);
-    document.title = `${integerFormatter.format(record.n)} points · Unit-distance atlas`;
+  function copyCoordinates(record) {
+    return new Float64Array(record.coordinates);
   }
 
-  async function selectRecord(index, { updateUrl = true } = {}) {
-    if (!state.records.length) return;
-    index = Math.max(0, Math.min(index, state.records.length - 1));
-    const record = state.records[index];
-    state.selectedIndex = index;
-    state.hoverIndex = -1;
-    updateNavigation();
-    drawChart();
-    resetZoom();
-    showStageMessage(`Loading ${integerFormatter.format(record.n)}-point graph…`);
+  function pointAt(array, index) {
+    return [array[2 * index], array[2 * index + 1]];
+  }
 
-    const token = ++state.selectionToken;
-    try {
-      const [svgText, metadata] = await Promise.all([
-        fetchText(record.svg, state.svgCache),
-        fetchMetadata(record.metadata),
-      ]);
-      if (token !== state.selectionToken) return;
-      putSvg(elements.artworkLayer, svgText);
-      updateCaption(record, metadata);
-      hideStageMessage();
-      if (updateUrl) {
-        const url = new URL(window.location.href);
-        url.searchParams.set("n", String(record.n));
-        try {
-          history.replaceState(null, "", url);
-        } catch {
-          // Harmless in restricted embedded previews.
-        }
+  function setPoint(array, index, x, y) {
+    array[2 * index] = x;
+    array[2 * index + 1] = y;
+  }
+
+  function curvePoint(ax, ay, bx, by, t, key, span) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const length = Math.hypot(dx, dy) || 1;
+    const sign = ((key * 2654435761) >>> 31) ? 1 : -1;
+    const magnitude = Math.min(0.105 * span, 0.24 * length + 0.018 * span) * sign;
+    const mx = (ax + bx) / 2 - (dy / length) * magnitude;
+    const my = (ay + by) / 2 + (dx / length) * magnitude;
+    const u = 1 - t;
+    return [u * u * ax + 2 * u * t * mx + t * t * bx, u * u * ay + 2 * u * t * my + t * t * by];
+  }
+
+  function normalizedPolarOrder(record) {
+    const centerX = (record.bounds[0] + record.bounds[2]) / 2;
+    const centerY = (record.bounds[1] + record.bounds[3]) / 2;
+    return Array.from({ length: record.n }, (_, index) => {
+      const x = record.coordinates[2 * index] - centerX;
+      const y = record.coordinates[2 * index + 1] - centerY;
+      return { index, angle: Math.atan2(y, x), radius: Math.hypot(x, y) };
+    }).sort((a, b) => a.angle - b.angle || a.radius - b.radius || a.index - b.index);
+  }
+
+  function genericMapping(source, target) {
+    const sourceOrder = normalizedPolarOrder(source);
+    const targetOrder = normalizedPolarOrder(target);
+    const count = Math.min(source.n, target.n);
+    const pairs = [];
+    for (let rank = 0; rank < count; rank += 1) {
+      const sourceRank = Math.floor((rank + 0.5) * sourceOrder.length / count);
+      const targetRank = Math.floor((rank + 0.5) * targetOrder.length / count);
+      pairs.push([sourceOrder[Math.min(sourceRank, sourceOrder.length - 1)].index, targetOrder[Math.min(targetRank, targetOrder.length - 1)].index]);
+    }
+    const usedSource = new Set(pairs.map((pair) => pair[0]));
+    const usedTarget = new Set(pairs.map((pair) => pair[1]));
+    return {
+      pairs,
+      extraSource: Array.from({ length: source.n }, (_, index) => index).filter((index) => !usedSource.has(index)),
+      extraTarget: Array.from({ length: target.n }, (_, index) => index).filter((index) => !usedTarget.has(index)),
+    };
+  }
+
+  function adjacentMapping(source, target, direction) {
+    const transitionRecord = direction > 0 ? target : source;
+    const transition = transitionRecord.transition;
+    if (!transition || Math.abs(source.n - target.n) !== 1) return null;
+    const oldToNew = transition.oldToNew.map(Number);
+    const pairs = [];
+    if (direction > 0) {
+      oldToNew.forEach((targetIndex, sourceIndex) => pairs.push([sourceIndex, targetIndex]));
+      return {
+        kind: transition.kind,
+        transition,
+        pairs,
+        extraSource: [],
+        extraTarget: [Number(transition.addedVertex)],
+      };
+    }
+    oldToNew.forEach((sourceIndex, targetIndex) => pairs.push([sourceIndex, targetIndex]));
+    return {
+      kind: transition.kind,
+      transition,
+      pairs,
+      extraSource: [Number(transition.addedVertex)],
+      extraTarget: [],
+    };
+  }
+
+  function makeAnimation(source, target, sourceIndex, targetIndex) {
+    const direction = Math.sign(targetIndex - sourceIndex) || 1;
+    const adjacent = Math.abs(targetIndex - sourceIndex) === 1;
+    const mapped = adjacent ? adjacentMapping(source, target, direction) : null;
+    const mapping = mapped || { kind: "transmutation", transition: null, ...genericMapping(source, target) };
+    const transition = mapping.transition;
+    const baseDuration = transition?.animation?.durationMs || (mapping.kind === "growth" ? 900 : 1500);
+    return {
+      source,
+      target,
+      sourceIndex,
+      targetIndex,
+      direction,
+      kind: mapping.kind || "transmutation",
+      pairs: mapping.pairs,
+      extraSource: mapping.extraSource,
+      extraTarget: mapping.extraTarget,
+      transition,
+      startedAt: performance.now(),
+      duration: state.prefersReducedMotion ? 1 : baseDuration / state.speed,
+    };
+  }
+
+  function phasePositions(animation, progress) {
+    const { source, target, pairs, extraSource, extraTarget, kind, transition } = animation;
+    const sourcePositions = new Float64Array(source.coordinates.length);
+    const targetPositions = new Float64Array(target.coordinates.length);
+    const baseNodes = [];
+    const specialNodes = [];
+    const sourceCenter = [(source.bounds[0] + source.bounds[2]) / 2, (source.bounds[1] + source.bounds[3]) / 2];
+    const targetCenter = [(target.bounds[0] + target.bounds[2]) / 2, (target.bounds[1] + target.bounds[3]) / 2];
+    const span = Math.max(
+      source.bounds[2] - source.bounds[0], source.bounds[3] - source.bounds[1],
+      target.bounds[2] - target.bounds[0], target.bounds[3] - target.bounds[1], 1,
+    );
+
+    const animationMetadata = transition?.animation || {};
+    const migrationStart = Number(animationMetadata.migrationStart ?? 0.16);
+    const migrationEnd = Number(animationMetadata.migrationEnd ?? 0.82);
+    const migrationT = kind === "growth"
+      ? easeInOutCubic(progress)
+      : easeInOutCubic(smoothstep(migrationStart, migrationEnd, progress));
+
+    pairs.forEach(([sourceIndex, targetIndex], pairIndex) => {
+      const ax = source.coordinates[2 * sourceIndex];
+      const ay = source.coordinates[2 * sourceIndex + 1];
+      const bx = target.coordinates[2 * targetIndex];
+      const by = target.coordinates[2 * targetIndex + 1];
+      let x;
+      let y;
+      if (kind === "growth") {
+        x = lerp(ax, bx, migrationT);
+        y = lerp(ay, by, migrationT);
+      } else {
+        [x, y] = curvePoint(ax, ay, bx, by, migrationT, pairIndex + 1, span);
       }
-    } catch (error) {
-      if (token !== state.selectionToken) return;
-      elements.artworkLayer.replaceChildren();
-      showStageMessage(`Could not load this graph: ${error.message}`);
-      console.error(error);
+      setPoint(sourcePositions, sourceIndex, x, y);
+      setPoint(targetPositions, targetIndex, x, y);
+      baseNodes.push({ x, y, alpha: 1, scale: 1 });
+    });
+
+    extraSource.forEach((sourceIndex, rank) => {
+      const ax = source.coordinates[2 * sourceIndex];
+      const ay = source.coordinates[2 * sourceIndex + 1];
+      const vanishT = kind === "growth" ? smoothstep(0.05, 0.86, progress) : smoothstep(0.12, 0.72, progress);
+      const x = lerp(ax, sourceCenter[0], 0.18 * vanishT);
+      const y = lerp(ay, sourceCenter[1], 0.18 * vanishT);
+      setPoint(sourcePositions, sourceIndex, x, y);
+      specialNodes.push({ x, y, alpha: 1 - vanishT, scale: 1 - 0.68 * vanishT, role: "vanish", rank });
+    });
+
+    extraTarget.forEach((targetIndex, rank) => {
+      const bx = target.coordinates[2 * targetIndex];
+      const by = target.coordinates[2 * targetIndex + 1];
+      let sx = targetCenter[0];
+      let sy = targetCenter[1];
+      if (transition?.spawn && Math.abs(source.n - target.n) === 1) {
+        sx = Number(transition.spawn[0]);
+        sy = Number(transition.spawn[1]);
+      }
+      const birthStart = kind === "growth" ? 0.02 : 0.46;
+      const birthT = smoothstep(birthStart, 0.96, progress);
+      const pushed = kind === "growth" ? spring(birthT) : easeInOutCubic(birthT);
+      const x = lerp(sx, bx, pushed);
+      const y = lerp(sy, by, pushed);
+      setPoint(targetPositions, targetIndex, x, y);
+      specialNodes.push({ x, y, alpha: birthT, scale: 0.18 + 0.82 * birthT, role: "birth", rank, targetIndex });
+    });
+
+    return { sourcePositions, targetPositions, baseNodes, specialNodes };
+  }
+
+  function drawEdgeSet(ctx, record, positions, alpha, style, dpr) {
+    if (alpha <= 0.001 || !record.edgeIndices.length) return;
+    ctx.save();
+    ctx.globalAlpha = clamp(0, alpha * style.edgeAlpha, 1);
+    ctx.strokeStyle = cssColor("--graph-edge", "#5ee7f4");
+    ctx.lineWidth = style.edgeWidth * Math.sqrt(view.zoom) * dpr;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
+      const a = record.edgeIndices[offset];
+      const b = record.edgeIndices[offset + 1];
+      const ax = positions[2 * a] * dpr;
+      const ay = positions[2 * a + 1] * dpr;
+      const bx = positions[2 * b] * dpr;
+      const by = positions[2 * b + 1] * dpr;
+      if (![ax, ay, bx, by].every(Number.isFinite)) continue;
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawIncidentEdges(ctx, record, positions, vertex, alpha, style, dpr) {
+    if (alpha <= 0.001 || vertex == null) return;
+    ctx.save();
+    ctx.globalAlpha = clamp(0, alpha * style.edgeAlpha, 1);
+    ctx.strokeStyle = cssColor("--graph-edge", "#5ee7f4");
+    ctx.lineWidth = style.edgeWidth * Math.sqrt(view.zoom) * dpr;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
+      const a = record.edgeIndices[offset];
+      const b = record.edgeIndices[offset + 1];
+      if (a !== vertex && b !== vertex) continue;
+      const ax = positions[2 * a] * dpr;
+      const ay = positions[2 * a + 1] * dpr;
+      const bx = positions[2 * b] * dpr;
+      const by = positions[2 * b + 1] * dpr;
+      if (![ax, ay, bx, by].every(Number.isFinite)) continue;
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawNodes(ctx, nodes, style, dpr, alpha = 1) {
+    if (!nodes.length || alpha <= 0.001) return;
+    const radius = style.nodeRadius * Math.sqrt(view.zoom) * dpr;
+    ctx.save();
+    ctx.globalAlpha = alpha * style.nodeAlpha;
+    ctx.fillStyle = cssColor("--graph-node", "#f8fbff");
+    ctx.strokeStyle = cssColor("--graph-outline", "#06101c");
+    ctx.lineWidth = style.outlineWidth * dpr;
+    ctx.shadowColor = cssColor("--graph-glow", "#22d3ee");
+    ctx.shadowBlur = style.glowBlur * dpr;
+    ctx.beginPath();
+    nodes.forEach((node) => {
+      const r = radius * (node.scale ?? 1);
+      ctx.moveTo(node.x * dpr + r, node.y * dpr);
+      ctx.arc(node.x * dpr, node.y * dpr, r, 0, Math.PI * 2);
+    });
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawSpecialNodes(ctx, nodes, style, dpr, progress) {
+    nodes.forEach((node) => {
+      const radius = style.nodeRadius * Math.sqrt(view.zoom) * dpr * node.scale;
+      if (node.alpha <= 0.001 || radius <= 0.05) return;
+      ctx.save();
+      ctx.globalAlpha = node.alpha * style.nodeAlpha;
+      ctx.fillStyle = cssColor("--graph-node", "#f8fbff");
+      ctx.strokeStyle = cssColor("--graph-edge", "#5ee7f4");
+      ctx.lineWidth = style.outlineWidth * dpr;
+      ctx.shadowColor = cssColor("--graph-glow", "#22d3ee");
+      ctx.shadowBlur = style.glowBlur * 1.35 * dpr;
+      ctx.beginPath();
+      ctx.arc(node.x * dpr, node.y * dpr, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+      if (node.role === "birth") {
+        const wave = Math.sin(Math.PI * clamp(0, progress, 1));
+        ctx.globalAlpha = node.alpha * wave * style.glowAlpha;
+        ctx.lineWidth = Math.max(1, 1.1 * dpr);
+        ctx.beginPath();
+        ctx.arc(node.x * dpr, node.y * dpr, (radius + style.haloRadius * wave * dpr), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
+
+  function nodesFromPositions(positions) {
+    const result = [];
+    for (let i = 0; i < positions.length; i += 2) result.push({ x: positions[i], y: positions[i + 1], alpha: 1, scale: 1 });
+    return result;
+  }
+
+  function renderStatic(record, ctx, metrics) {
+    const camera = fitBounds(record.bounds, metrics.width, metrics.height);
+    const screen = toScreenPositions(record.coordinates, camera, metrics.width, metrics.height);
+    const style = visualStyle(record.n, record.averageDegree);
+    drawEdgeSet(ctx, record, screen, 1, style, metrics.dpr);
+    drawNodes(ctx, nodesFromPositions(screen), style, metrics.dpr);
+  }
+
+  function renderAnimation(animation, progress, ctx, metrics) {
+    const positions = phasePositions(animation, progress);
+    const cameraProgress = easeInOutCubic(progress);
+    const worldBounds = interpolateBounds(animation.source.bounds, animation.target.bounds, cameraProgress);
+    const camera = fitBounds(worldBounds, metrics.width, metrics.height);
+    const sourceScreen = toScreenPositions(positions.sourcePositions, camera, metrics.width, metrics.height);
+    const targetScreen = toScreenPositions(positions.targetPositions, camera, metrics.width, metrics.height);
+    const baseWorld = new Float64Array(positions.baseNodes.length * 2);
+    positions.baseNodes.forEach((node, index) => setPoint(baseWorld, index, node.x, node.y));
+    const baseScreen = toScreenPositions(baseWorld, camera, metrics.width, metrics.height);
+    const baseNodes = positions.baseNodes.map((node, index) => ({ ...node, x: baseScreen[2 * index], y: baseScreen[2 * index + 1] }));
+    const specialWorld = new Float64Array(positions.specialNodes.length * 2);
+    positions.specialNodes.forEach((node, index) => setPoint(specialWorld, index, node.x, node.y));
+    const specialScreen = toScreenPositions(specialWorld, camera, metrics.width, metrics.height);
+    const specialNodes = positions.specialNodes.map((node, index) => ({ ...node, x: specialScreen[2 * index], y: specialScreen[2 * index + 1] }));
+    const nInterpolated = lerp(animation.source.n, animation.target.n, cameraProgress);
+    const degreeInterpolated = lerp(animation.source.averageDegree, animation.target.averageDegree, cameraProgress);
+    const style = visualStyle(nInterpolated, degreeInterpolated);
+
+    if (animation.kind === "growth") {
+      if (animation.direction > 0) {
+        drawEdgeSet(ctx, animation.source, sourceScreen, 1, style, metrics.dpr);
+        const added = animation.extraTarget[0];
+        drawIncidentEdges(ctx, animation.target, targetScreen, added, smoothstep(0.18, 0.92, progress), style, metrics.dpr);
+      } else {
+        drawEdgeSet(ctx, animation.target, targetScreen, 1, style, metrics.dpr);
+        const disappearing = animation.extraSource[0];
+        drawIncidentEdges(ctx, animation.source, sourceScreen, disappearing, 1 - smoothstep(0.08, 0.82, progress), style, metrics.dpr);
+      }
+    } else {
+      const metadata = animation.transition?.animation || {};
+      const fadeOutEnd = Number(metadata.edgeFadeOutEnd ?? 0.20);
+      const fadeInStart = Number(metadata.edgeFadeInStart ?? 0.78);
+      drawEdgeSet(ctx, animation.source, sourceScreen, 1 - smoothstep(0, fadeOutEnd, progress), style, metrics.dpr);
+      drawEdgeSet(ctx, animation.target, targetScreen, smoothstep(fadeInStart, 1, progress), style, metrics.dpr);
+    }
+
+    drawNodes(ctx, baseNodes, style, metrics.dpr);
+    drawSpecialNodes(ctx, specialNodes, style, metrics.dpr, progress);
+
+    if (animation.kind === "growth" && animation.transition?.spawnNeighbors?.length) {
+      // spawnNeighbors are indices in the larger record in both directions.
+      const neighborIndices = animation.transition.spawnNeighbors;
+      const sourceArray = animation.direction > 0 ? targetScreen : sourceScreen;
+      const pulse = Math.sin(Math.PI * smoothstep(0, 0.72, progress));
+      if (pulse > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = pulse * style.glowAlpha * 0.62;
+        ctx.strokeStyle = cssColor("--graph-edge", "#5ee7f4");
+        ctx.lineWidth = Math.max(1, 0.9 * metrics.dpr);
+        neighborIndices.forEach((index) => {
+          const x = sourceArray[2 * index] * metrics.dpr;
+          const y = sourceArray[2 * index + 1] * metrics.dpr;
+          if (!Number.isFinite(x + y)) return;
+          ctx.beginPath();
+          ctx.arc(x, y, (style.nodeRadius + style.haloRadius * 0.45 * pulse) * metrics.dpr, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
     }
   }
 
-  function selectByN(value) {
-    const parsed = Number.parseInt(String(value), 10);
-    if (!Number.isFinite(parsed)) return;
-    const index = nearestRecordIndex(parsed);
-    if (index >= 0) selectRecord(index);
+  function drawStage(now = performance.now()) {
+    state.frameHandle = 0;
+    const metrics = resizeCanvas(elements.graphCanvas);
+    const ctx = elements.graphCanvas.getContext("2d", { alpha: true });
+    ctx.clearRect(0, 0, elements.graphCanvas.width, elements.graphCanvas.height);
+
+    if (state.animation) {
+      const elapsed = now - state.animation.startedAt;
+      const progress = clamp(0, elapsed / state.animation.duration, 1);
+      renderAnimation(state.animation, progress, ctx, metrics);
+      elements.transitionBadge.textContent = state.animation.kind === "growth" ? "cell division" : "transmutation";
+      if (progress >= 1) finishAnimation(now);
+    } else if (state.currentRecord) {
+      renderStatic(state.currentRecord, ctx, metrics);
+      elements.transitionBadge.textContent = "still";
+      if (state.playing && now >= state.playDueAt) step(1);
+    }
+
+    if (state.animation || state.playing) requestStageFrame();
   }
 
-  function cssVariable(name) {
-    return getComputedStyle(elements.body).getPropertyValue(name).trim();
+  function requestStageFrame() {
+    if (!state.frameHandle) state.frameHandle = requestAnimationFrame(drawStage);
   }
 
-  function niceStep(range, desiredTicks) {
-    if (!(range > 0)) return 1;
-    const rough = range / Math.max(1, desiredTicks);
-    const exponent = Math.floor(Math.log10(rough));
-    const magnitude = 10 ** exponent;
-    const fraction = rough / magnitude;
-    let niceFraction;
-    if (fraction <= 1) niceFraction = 1;
-    else if (fraction <= 2) niceFraction = 2;
-    else if (fraction <= 5) niceFraction = 5;
-    else niceFraction = 10;
-    return niceFraction * magnitude;
+  function updateControls() {
+    const index = state.animation ? state.animation.targetIndex : state.currentIndex;
+    const summary = state.summaries[index];
+    elements.previousButton.disabled = index <= 0;
+    elements.nextButton.disabled = index < 0 || index >= state.summaries.length - 1;
+    elements.nInput.value = summary ? summary.n : "";
+    elements.timeline.value = summary ? summary.n : 1;
+    elements.playIcon.textContent = state.playing ? "❚❚" : "▶";
+    elements.playLabel.textContent = state.playing ? "Pause" : "Play";
+    elements.playButton.setAttribute("aria-pressed", String(state.playing));
+  }
+
+  function updateRecordCopy(index, record, arrivalOverride = null) {
+    const summary = state.summaries[index];
+    const optimality = record.optimality?.status || summary.optimality || "strict atlas record";
+    elements.recordKicker.textContent = optimality;
+    elements.graphTitle.textContent = record.legend;
+    elements.edgeCount.textContent = numberFormat.format(record.edges);
+    elements.averageDegree.textContent = decimalFormat.format(record.averageDegree);
+    elements.hostName.textContent = record.host?.label || summary.host || "—";
+    const arrival = arrivalOverride || record.transition?.kind || (record.n === 1 ? "origin" : "loaded");
+    elements.arrivalType.textContent = arrival === "growth" ? "Cell division" : arrival === "transmutation" ? "Transmutation" : arrival;
+    elements.metadataLink.href = summary.record;
+    elements.hudN.textContent = `n = ${numberFormat.format(record.n)}`;
+    elements.hudEdges.textContent = `${numberFormat.format(record.edges)} edges`;
+    document.title = `${record.n} points · ${record.edges} edges — Unit-distance motion atlas`;
+  }
+
+  function finishAnimation(now) {
+    const animation = state.animation;
+    if (!animation) return;
+    state.currentIndex = animation.targetIndex;
+    state.currentRecord = animation.target;
+    state.animation = null;
+    state.playDueAt = now + 230 / state.speed;
+    updateRecordCopy(state.currentIndex, state.currentRecord);
+    updateControls();
+    drawChart();
+    prefetchAround(state.currentIndex);
+  }
+
+  async function navigateTo(index, { animate = true } = {}) {
+    index = clamp(0, Math.round(index), state.summaries.length - 1);
+    if (index === state.currentIndex && !state.animation) return;
+    const token = ++state.navigationToken;
+    try {
+      const target = await loadRecord(index);
+      if (token !== state.navigationToken) return;
+      hideMessage();
+      if (!state.currentRecord || !animate || state.prefersReducedMotion) {
+        state.animation = null;
+        state.currentIndex = index;
+        state.currentRecord = target;
+        state.playDueAt = performance.now() + 230 / state.speed;
+        updateRecordCopy(index, target);
+      } else {
+        const source = state.animation ? state.animation.target : state.currentRecord;
+        const sourceIndex = state.animation ? state.animation.targetIndex : state.currentIndex;
+        state.animation = makeAnimation(source, target, sourceIndex, index);
+        updateRecordCopy(index, target, state.animation.kind);
+      }
+      updateControls();
+      drawChart();
+      requestStageFrame();
+      prefetchAround(index);
+    } catch (error) {
+      console.error(error);
+      showMessage(`Could not load record ${state.summaries[index]?.n ?? index + 1}: ${error.message}`);
+      state.playing = false;
+      updateControls();
+    }
+  }
+
+  function step(direction) {
+    const base = state.animation ? state.animation.targetIndex : state.currentIndex;
+    const target = clamp(0, base + direction, state.summaries.length - 1);
+    if (target === base) {
+      state.playing = false;
+      updateControls();
+      return;
+    }
+    navigateTo(target);
+  }
+
+  function togglePlay() {
+    state.playing = !state.playing;
+    if (state.playing && state.currentIndex >= state.summaries.length - 1 && !state.animation) {
+      navigateTo(0, { animate: false });
+    }
+    state.playDueAt = performance.now();
+    updateControls();
+    requestStageFrame();
+  }
+
+  function prefetchAround(index) {
+    [index - 2, index - 1, index + 1, index + 2].forEach((candidate) => {
+      if (candidate >= 0 && candidate < state.summaries.length) loadRecord(candidate).catch(() => {});
+    });
+  }
+
+  function resetView() {
+    view.zoom = 1;
+    view.panX = 0;
+    view.panY = 0;
+    requestStageFrame();
+  }
+
+  function zoomAt(factor, clientX, clientY) {
+    const rect = elements.graphCanvas.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const oldZoom = view.zoom;
+    const nextZoom = clamp(0.22, oldZoom * factor, 18);
+    const ratio = nextZoom / oldZoom;
+    view.panX = px - centerX - (px - centerX - view.panX) * ratio;
+    view.panY = py - centerY - (py - centerY - view.panY) * ratio;
+    view.zoom = nextZoom;
+    requestStageFrame();
+  }
+
+  function beginPointer(event) {
+    elements.stage.setPointerCapture(event.pointerId);
+    view.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (view.pointers.size === 1) {
+      view.gesture = { type: "pan", x: event.clientX, y: event.clientY, panX: view.panX, panY: view.panY };
+    } else if (view.pointers.size === 2) {
+      const points = [...view.pointers.values()];
+      const dx = points[1].x - points[0].x;
+      const dy = points[1].y - points[0].y;
+      view.gesture = {
+        type: "pinch",
+        distance: Math.hypot(dx, dy),
+        midpointX: (points[0].x + points[1].x) / 2,
+        midpointY: (points[0].y + points[1].y) / 2,
+        zoom: view.zoom,
+        panX: view.panX,
+        panY: view.panY,
+      };
+    }
+  }
+
+  function movePointer(event) {
+    if (!view.pointers.has(event.pointerId)) return;
+    view.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (view.pointers.size === 1 && view.gesture?.type === "pan") {
+      view.panX = view.gesture.panX + event.clientX - view.gesture.x;
+      view.panY = view.gesture.panY + event.clientY - view.gesture.y;
+      requestStageFrame();
+    } else if (view.pointers.size === 2) {
+      const points = [...view.pointers.values()];
+      const dx = points[1].x - points[0].x;
+      const dy = points[1].y - points[0].y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const midpointX = (points[0].x + points[1].x) / 2;
+      const midpointY = (points[0].y + points[1].y) / 2;
+      if (view.gesture?.type !== "pinch") {
+        view.gesture = { type: "pinch", distance, midpointX, midpointY, zoom: view.zoom, panX: view.panX, panY: view.panY };
+      }
+      const rect = elements.graphCanvas.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const nextZoom = clamp(0.22, view.gesture.zoom * distance / Math.max(1, view.gesture.distance), 18);
+      const ratio = nextZoom / view.gesture.zoom;
+      view.panX = midpointX - centerX - (view.gesture.midpointX - centerX - view.gesture.panX) * ratio;
+      view.panY = midpointY - centerY - (view.gesture.midpointY - centerY - view.gesture.panY) * ratio;
+      view.zoom = nextZoom;
+      requestStageFrame();
+    }
+  }
+
+  function endPointer(event) {
+    view.pointers.delete(event.pointerId);
+    if (view.pointers.size === 1) {
+      const point = [...view.pointers.values()][0];
+      view.gesture = { type: "pan", x: point.x, y: point.y, panX: view.panX, panY: view.panY };
+    } else if (view.pointers.size === 0) {
+      view.gesture = null;
+    }
+  }
+
+  function chartTheme() {
+    return {
+      grid: cssColor("--chart-grid", "rgba(148,163,184,.13)"),
+      axis: cssColor("--chart-axis", "rgba(148,163,184,.55)"),
+      line: cssColor("--chart-line", "#67e8f9"),
+      fill: cssColor("--chart-fill", "rgba(34,211,238,.075)"),
+      marker: cssColor("--chart-marker", "#f8fafc"),
+      muted: cssColor("--muted", "#92a2b9"),
+    };
+  }
+
+  function niceMaximum(value) {
+    if (value <= 0) return 1;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+    const normalized = value / magnitude;
+    const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+    return nice * magnitude;
   }
 
   function drawChart() {
-    const canvas = elements.chart;
-    const rect = elements.chartWrap.getBoundingClientRect();
-    if (!rect.width || !rect.height || !state.records.length) return;
-
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const pixelWidth = Math.max(1, Math.round(rect.width * dpr));
-    const pixelHeight = Math.max(1, Math.round(rect.height * dpr));
-    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-      canvas.width = pixelWidth;
-      canvas.height = pixelHeight;
-    }
-
-    const context = canvas.getContext("2d");
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.clearRect(0, 0, rect.width, rect.height);
-
-    const compact = rect.width < 560;
-    const margin = {
-      left: compact ? 53 : 68,
-      right: compact ? 14 : 24,
-      top: 20,
-      bottom: compact ? 47 : 54,
+    if (!state.summaries.length) return;
+    const metrics = resizeCanvas(elements.recordChart);
+    const ctx = elements.recordChart.getContext("2d", { alpha: true });
+    ctx.clearRect(0, 0, elements.recordChart.width, elements.recordChart.height);
+    const theme = chartTheme();
+    const dpr = metrics.dpr;
+    const margins = { left: 54, right: 18, top: 18, bottom: 35 };
+    const plot = {
+      x: margins.left,
+      y: margins.top,
+      width: Math.max(1, metrics.width - margins.left - margins.right),
+      height: Math.max(1, metrics.height - margins.top - margins.bottom),
     };
-    const plotWidth = Math.max(1, rect.width - margin.left - margin.right);
-    const plotHeight = Math.max(1, rect.height - margin.top - margin.bottom);
-    const xMin = state.records[0].n;
-    const xMaxRaw = state.records[state.records.length - 1].n;
-    const xMax = xMaxRaw === xMin ? xMin + 1 : xMaxRaw;
-    const maximumEdgeCount = Math.max(...state.records.map((record) => record.edges), 1);
-    const yStep = niceStep(maximumEdgeCount, compact ? 4 : 6);
-    const yMax = Math.ceil(maximumEdgeCount / yStep) * yStep;
+    const nMin = state.summaries[0].n;
+    const nMax = state.summaries[state.summaries.length - 1].n;
+    const edgeMax = niceMaximum(Math.max(...state.summaries.map((record) => record.edges)) * 1.03);
+    const xFor = (n) => plot.x + (n - nMin) / Math.max(1, nMax - nMin) * plot.width;
+    const yFor = (edges) => plot.y + plot.height - edges / edgeMax * plot.height;
+    state.chartMetrics = { ...plot, nMin, nMax, edgeMax, xFor, yFor, width: metrics.width, height: metrics.height };
 
-    const xForN = (n) => margin.left + ((n - xMin) / (xMax - xMin)) * plotWidth;
-    const yForEdges = (edges) => margin.top + plotHeight - (edges / yMax) * plotHeight;
-
-    state.chartMetrics = {
-      rect,
-      margin,
-      plotWidth,
-      plotHeight,
-      xMin,
-      xMax,
-      yMax,
-      xForN,
-      yForEdges,
-    };
-
-    const grid = cssVariable("--chart-grid");
-    const axis = cssVariable("--chart-axis");
-    const muted = cssVariable("--muted");
-    const line = cssVariable("--chart-line");
-    const fill = cssVariable("--chart-fill");
-    const selected = cssVariable("--chart-selected");
-
-    context.lineWidth = 1;
-    context.strokeStyle = grid;
-    context.fillStyle = muted;
-    context.font = `${compact ? 10 : 11}px ui-sans-serif, system-ui, sans-serif`;
-    context.textBaseline = "middle";
-
-    for (let value = 0; value <= yMax + yStep * 0.25; value += yStep) {
-      const y = yForEdges(value);
-      context.beginPath();
-      context.moveTo(margin.left, y);
-      context.lineTo(margin.left + plotWidth, y);
-      context.stroke();
-      context.textAlign = "right";
-      context.fillText(integerFormatter.format(value), margin.left - 9, y);
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = theme.muted;
+    ctx.strokeStyle = theme.grid;
+    ctx.lineWidth = 1;
+    const gridLines = 5;
+    for (let i = 0; i <= gridLines; i += 1) {
+      const fraction = i / gridLines;
+      const y = plot.y + plot.height * fraction;
+      ctx.beginPath();
+      ctx.moveTo(plot.x, y);
+      ctx.lineTo(plot.x + plot.width, y);
+      ctx.stroke();
+      const value = edgeMax * (1 - fraction);
+      ctx.textAlign = "right";
+      ctx.fillText(numberFormat.format(value), plot.x - 9, y);
+    }
+    for (let i = 0; i <= 4; i += 1) {
+      const fraction = i / 4;
+      const n = Math.round(lerp(nMin, nMax, fraction));
+      const x = xFor(n);
+      ctx.strokeStyle = theme.grid;
+      ctx.beginPath();
+      ctx.moveTo(x, plot.y);
+      ctx.lineTo(x, plot.y + plot.height);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.fillStyle = theme.muted;
+      ctx.fillText(numberFormat.format(n), x, plot.y + plot.height + 19);
     }
 
-    const xStep = niceStep(xMax - xMin, compact ? 4 : 7);
-    const firstXTick = Math.ceil(xMin / xStep) * xStep;
-    for (let value = firstXTick; value <= xMax + xStep * 0.1; value += xStep) {
-      const x = xForN(value);
-      context.beginPath();
-      context.moveTo(x, margin.top);
-      context.lineTo(x, margin.top + plotHeight);
-      context.stroke();
-      context.textAlign = "center";
-      context.textBaseline = "top";
-      context.fillText(integerFormatter.format(value), x, margin.top + plotHeight + 9);
-    }
-
-    context.strokeStyle = axis;
-    context.beginPath();
-    context.moveTo(margin.left, margin.top);
-    context.lineTo(margin.left, margin.top + plotHeight);
-    context.lineTo(margin.left + plotWidth, margin.top + plotHeight);
-    context.stroke();
-
-    context.fillStyle = muted;
-    context.textAlign = "center";
-    context.textBaseline = "bottom";
-    context.fillText("points", margin.left + plotWidth / 2, rect.height - 5);
-    context.save();
-    context.translate(compact ? 13 : 15, margin.top + plotHeight / 2);
-    context.rotate(-Math.PI / 2);
-    context.fillText("unit-distance edges", 0, 0);
-    context.restore();
-
-    const records = state.records;
-    context.beginPath();
-    records.forEach((record, index) => {
-      const x = xForN(record.n);
-      const y = yForEdges(record.edges);
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
+    ctx.beginPath();
+    state.summaries.forEach((record, index) => {
+      const x = xFor(record.n);
+      const y = yFor(record.edges);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
-    context.lineTo(xForN(records[records.length - 1].n), margin.top + plotHeight);
-    context.lineTo(xForN(records[0].n), margin.top + plotHeight);
-    context.closePath();
-    context.fillStyle = fill;
-    context.fill();
+    ctx.lineTo(xFor(nMax), plot.y + plot.height);
+    ctx.lineTo(xFor(nMin), plot.y + plot.height);
+    ctx.closePath();
+    ctx.fillStyle = theme.fill;
+    ctx.fill();
 
-    context.beginPath();
-    records.forEach((record, index) => {
-      const x = xForN(record.n);
-      const y = yForEdges(record.edges);
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
+    ctx.beginPath();
+    state.summaries.forEach((record, index) => {
+      const x = xFor(record.n);
+      const y = yFor(record.edges);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
-    context.strokeStyle = line;
-    context.lineWidth = 2;
-    context.lineJoin = "round";
-    context.lineCap = "round";
-    context.stroke();
+    ctx.strokeStyle = theme.line;
+    ctx.lineWidth = 1.7;
+    ctx.lineJoin = "round";
+    ctx.stroke();
 
-    const markerIndex = state.hoverIndex >= 0 ? state.hoverIndex : state.selectedIndex;
-    if (markerIndex >= 0 && records[markerIndex]) {
-      const record = records[markerIndex];
-      const x = xForN(record.n);
-      const y = yForEdges(record.edges);
-      context.strokeStyle = state.hoverIndex >= 0 ? line : axis;
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(x, margin.top);
-      context.lineTo(x, margin.top + plotHeight);
-      context.stroke();
-
-      context.fillStyle = selected;
-      context.beginPath();
-      context.arc(x, y, state.hoverIndex >= 0 ? 5 : 4, 0, Math.PI * 2);
-      context.fill();
-      context.strokeStyle = line;
-      context.lineWidth = 2;
-      context.stroke();
+    const selectedIndex = state.animation ? state.animation.targetIndex : state.currentIndex;
+    if (selectedIndex >= 0) {
+      const selected = state.summaries[selectedIndex];
+      const x = xFor(selected.n);
+      const y = yFor(selected.edges);
+      ctx.strokeStyle = theme.line;
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath();
+      ctx.moveTo(x, plot.y);
+      ctx.lineTo(x, plot.y + plot.height);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = theme.marker;
+      ctx.strokeStyle = theme.line;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
+    ctx.restore();
   }
 
-  function chartIndexAtClientX(clientX) {
-    const metrics = state.chartMetrics;
-    if (!metrics) return -1;
-    const rect = elements.chartWrap.getBoundingClientRect();
-    const x = Math.max(
-      metrics.margin.left,
-      Math.min(clientX - rect.left, metrics.margin.left + metrics.plotWidth),
-    );
-    const fraction = (x - metrics.margin.left) / metrics.plotWidth;
-    const approximateN = metrics.xMin + fraction * (metrics.xMax - metrics.xMin);
-    return nearestRecordIndex(approximateN);
+  function chartIndexFromEvent(event) {
+    if (!state.chartMetrics) return -1;
+    const rect = elements.recordChart.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const fraction = clamp(0, (x - state.chartMetrics.x) / state.chartMetrics.width, 1);
+    const n = Math.round(lerp(state.chartMetrics.nMin, state.chartMetrics.nMax, fraction));
+    return clamp(0, n - state.summaries[0].n, state.summaries.length - 1);
   }
 
-  function positionTooltip(clientX, clientY) {
-    const wrapRect = elements.chartWrap.getBoundingClientRect();
-    const localX = clientX - wrapRect.left;
-    const localY = clientY - wrapRect.top;
-    const tooltipRect = elements.chartTooltip.getBoundingClientRect();
-    const gap = 14;
-    let left = localX + gap;
-    if (left + tooltipRect.width > wrapRect.width - 8) {
-      left = localX - tooltipRect.width - gap;
-    }
-    left = Math.max(8, Math.min(left, wrapRect.width - tooltipRect.width - 8));
-    let top = localY - tooltipRect.height / 2;
-    top = Math.max(8, Math.min(top, wrapRect.height - tooltipRect.height - 8));
-    elements.chartTooltip.style.left = `${left}px`;
-    elements.chartTooltip.style.top = `${top}px`;
+  function drawMiniature(record) {
+    const metrics = resizeCanvas(elements.tooltipCanvas);
+    const ctx = elements.tooltipCanvas.getContext("2d", { alpha: true });
+    ctx.clearRect(0, 0, elements.tooltipCanvas.width, elements.tooltipCanvas.height);
+    const camera = fitBounds(record.bounds, metrics.width, metrics.height);
+    const oldView = { zoom: view.zoom, panX: view.panX, panY: view.panY };
+    view.zoom = 1;
+    view.panX = 0;
+    view.panY = 0;
+    const screen = toScreenPositions(record.coordinates, camera, metrics.width, metrics.height);
+    const style = visualStyle(record.n, record.averageDegree);
+    style.nodeRadius = clamp(1.1, style.nodeRadius * 0.58, 3.8);
+    style.edgeWidth = clamp(0.42, style.edgeWidth * 0.55, 1.15);
+    style.glowBlur *= 0.25;
+    drawEdgeSet(ctx, record, screen, 1, style, metrics.dpr);
+    drawNodes(ctx, nodesFromPositions(screen), style, metrics.dpr);
+    view.zoom = oldView.zoom;
+    view.panX = oldView.panX;
+    view.panY = oldView.panY;
   }
 
-  async function showChartTooltip(index, clientX, clientY) {
+  async function showChartTooltip(event) {
+    const index = chartIndexFromEvent(event);
     if (index < 0) return;
-    const record = state.records[index];
     state.hoverIndex = index;
-    drawChart();
-    elements.tooltipTitle.textContent = `${integerFormatter.format(record.n)} points`;
-    elements.tooltipSubtitle.textContent = `${integerFormatter.format(record.edges)} unit distances`;
+    const summary = state.summaries[index];
+    const rect = elements.chartWrap.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
     elements.chartTooltip.hidden = false;
-    requestAnimationFrame(() => positionTooltip(clientX, clientY));
-
-    if (state.tooltipRecordIndex === index) return;
-    state.tooltipRecordIndex = index;
-    elements.tooltipPreview.textContent = "Loading preview…";
+    elements.chartTooltip.style.left = `${clamp(0, x, rect.width - 250)}px`;
+    elements.chartTooltip.style.top = `${clamp(82, y, rect.height - 82)}px`;
+    elements.tooltipTitle.textContent = `${numberFormat.format(summary.n)} points · ${numberFormat.format(summary.edges)} edges`;
+    elements.tooltipSubtitle.textContent = `${summary.host} · ${summary.transition || "origin"}`;
     const token = ++state.tooltipToken;
     try {
-      const svgText = await fetchText(record.svg, state.svgCache);
+      const record = await loadRecord(index);
       if (token !== state.tooltipToken || state.hoverIndex !== index) return;
-      putSvg(elements.tooltipPreview, svgText);
-      requestAnimationFrame(() => positionTooltip(clientX, clientY));
+      drawMiniature(record);
     } catch (error) {
-      if (token !== state.tooltipToken) return;
-      elements.tooltipPreview.textContent = "Preview unavailable";
-      console.error(error);
+      console.warn(error);
     }
   }
 
   function hideChartTooltip() {
     state.hoverIndex = -1;
-    state.tooltipRecordIndex = -1;
     state.tooltipToken += 1;
     elements.chartTooltip.hidden = true;
+  }
+
+  function applyTheme(theme) {
+    const selected = theme === "light" ? "light" : "dark";
+    elements.body.dataset.theme = selected;
+    elements.themeIcon.textContent = selected === "dark" ? "☀" : "☾";
+    elements.themeButton.title = selected === "dark" ? "Switch to light mode" : "Switch to dark mode";
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = selected === "dark" ? "#060910" : "#edf3f8";
+    localStorage.setItem("unit-distance-theme", selected);
     drawChart();
+    requestStageFrame();
+    if (!elements.chartTooltip.hidden && state.hoverIndex >= 0) loadRecord(state.hoverIndex).then(drawMiniature).catch(() => {});
   }
 
-  function clampScale(value) {
-    return Math.max(0.35, Math.min(24, value));
-  }
-
-  function applyViewTransform() {
-    const svg = elements.artworkLayer.firstElementChild;
-    if (!svg || svg.localName !== "svg") return;
-
-    if (!view.artworkBounds) {
-      // Measure the CSS layout at its natural size. Changing the SVG's box
-      // instead of transforming a fixed-size layer keeps the browser painting
-      // the vectors at the current zoom rather than enlarging a cached bitmap.
-      svg.style.removeProperty("top");
-      svg.style.removeProperty("left");
-      svg.style.removeProperty("width");
-      svg.style.removeProperty("height");
-      const svgRect = svg.getBoundingClientRect();
-      const layerRect = elements.artworkLayer.getBoundingClientRect();
-      view.artworkBounds = {
-        top: svgRect.top - layerRect.top,
-        left: svgRect.left - layerRect.left,
-        width: svgRect.width,
-        height: svgRect.height,
-      };
-    }
-
-    const bounds = view.artworkBounds;
-    svg.style.top = `${view.y + bounds.top * view.scale}px`;
-    svg.style.left = `${view.x + bounds.left * view.scale}px`;
-    svg.style.width = `${bounds.width * view.scale}px`;
-    svg.style.height = `${bounds.height * view.scale}px`;
-  }
-
-  function resetZoom() {
-    view.scale = 1;
-    view.x = 0;
-    view.y = 0;
-    view.pointers.clear();
-    view.gesture = null;
-    applyViewTransform();
-  }
-
-  function zoomAt(clientX, clientY, factor) {
-    const rect = elements.stage.getBoundingClientRect();
-    const pointX = clientX - rect.left;
-    const pointY = clientY - rect.top;
-    const oldScale = view.scale;
-    const newScale = clampScale(oldScale * factor);
-    const worldX = (pointX - view.x) / oldScale;
-    const worldY = (pointY - view.y) / oldScale;
-    view.scale = newScale;
-    view.x = pointX - worldX * newScale;
-    view.y = pointY - worldY * newScale;
-    applyViewTransform();
-  }
-
-  function zoomAtStageCenter(factor) {
-    const rect = elements.stage.getBoundingClientRect();
-    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
-  }
-
-  function localPointer(event) {
-    const rect = elements.stage.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  }
-
-  function beginPanGesture(pointerId) {
-    const point = view.pointers.get(pointerId);
-    if (!point) return;
-    view.gesture = {
-      type: "pan",
-      pointerId,
-      startPointerX: point.x,
-      startPointerY: point.y,
-      startX: view.x,
-      startY: view.y,
-    };
-  }
-
-  function beginPinchGesture() {
-    const points = [...view.pointers.values()].slice(0, 2);
-    if (points.length < 2) return;
-    const [a, b] = points;
-    const middleX = (a.x + b.x) / 2;
-    const middleY = (a.y + b.y) / 2;
-    const distance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    view.gesture = {
-      type: "pinch",
-      startDistance: distance,
-      startScale: view.scale,
-      worldX: (middleX - view.x) / view.scale,
-      worldY: (middleY - view.y) / view.scale,
-    };
-  }
-
-  function setTheme(theme, persist = true) {
-    state.theme = theme === "light" ? "light" : "dark";
-    elements.body.dataset.theme = state.theme;
-    const dark = state.theme === "dark";
-    elements.themeIcon.textContent = dark ? "☀" : "☾";
-    const label = dark ? "Switch to light mode" : "Switch to dark mode";
-    elements.themeButton.title = label;
-    elements.themeButton.setAttribute("aria-label", label);
-    if (persist) {
-      try {
-        localStorage.setItem("unitDistanceAtlasTheme", state.theme);
-      } catch {
-        // Some embedded/file contexts intentionally deny local storage.
-      }
-    }
-    requestAnimationFrame(drawChart);
-  }
-
-  async function fetchCatalog() {
-    for (const url of ["data/catalog.local.json", "data/catalog.json"]) {
-      const response = await fetch(url, { cache: "no-store" });
-      if (response.ok) return response.json();
-      if (url.endsWith("catalog.json")) {
-        throw new Error(`${response.status} ${response.statusText}`);
-      }
-    }
-    throw new Error("No catalog is available");
-  }
-
-  function bindEvents() {
-    elements.previousButton.addEventListener("click", () => selectRecord(state.selectedIndex - 1));
-    elements.nextButton.addEventListener("click", () => selectRecord(state.selectedIndex + 1));
-    elements.nInput.addEventListener("change", () => selectByN(elements.nInput.value));
-    elements.nInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        selectByN(elements.nInput.value);
-        elements.nInput.blur();
+  function installEvents() {
+    elements.previousButton.addEventListener("click", () => step(-1));
+    elements.nextButton.addEventListener("click", () => step(1));
+    elements.playButton.addEventListener("click", togglePlay);
+    elements.nInput.addEventListener("change", () => {
+      const n = clamp(state.summaries[0].n, Number(elements.nInput.value) || 1, state.summaries.at(-1).n);
+      navigateTo(n - state.summaries[0].n);
+    });
+    elements.timeline.addEventListener("input", () => navigateTo(Number(elements.timeline.value) - state.summaries[0].n));
+    elements.speedSelect.addEventListener("change", () => {
+      state.speed = Number(elements.speedSelect.value) || 1;
+      if (state.animation) {
+        const progress = clamp(0, (performance.now() - state.animation.startedAt) / state.animation.duration, 1);
+        const baseDuration = state.animation.transition?.animation?.durationMs || (state.animation.kind === "growth" ? 900 : 1500);
+        state.animation.duration = state.prefersReducedMotion ? 1 : baseDuration / state.speed;
+        state.animation.startedAt = performance.now() - progress * state.animation.duration;
       }
     });
-
-    elements.themeButton.addEventListener("click", () => {
-      setTheme(state.theme === "dark" ? "light" : "dark");
+    elements.themeButton.addEventListener("click", () => applyTheme(elements.body.dataset.theme === "dark" ? "light" : "dark"));
+    elements.zoomInButton.addEventListener("click", () => {
+      const rect = elements.graphCanvas.getBoundingClientRect();
+      zoomAt(1.25, rect.left + rect.width / 2, rect.top + rect.height / 2);
     });
-
-    elements.zoomInButton.addEventListener("click", () => zoomAtStageCenter(1.3));
-    elements.zoomOutButton.addEventListener("click", () => zoomAtStageCenter(1 / 1.3));
-    elements.resetZoomButton.addEventListener("click", resetZoom);
-    elements.stage.addEventListener("dblclick", (event) => {
-      // Rapid button presses also emit a bubbling dblclick; do not interpret
-      // that as the stage's double-click-to-reset gesture.
-      if (event.target.closest("button, a, input")) return;
-      resetZoom();
+    elements.zoomOutButton.addEventListener("click", () => {
+      const rect = elements.graphCanvas.getBoundingClientRect();
+      zoomAt(0.8, rect.left + rect.width / 2, rect.top + rect.height / 2);
     });
-    elements.stage.addEventListener("dragstart", (event) => event.preventDefault());
-
-    elements.stage.addEventListener(
-      "wheel",
-      (event) => {
-        event.preventDefault();
-        const factor = Math.exp(-event.deltaY * 0.0015);
-        zoomAt(event.clientX, event.clientY, factor);
-      },
-      { passive: false },
-    );
-
-    elements.stage.addEventListener("pointerdown", (event) => {
-      // Let controls inside the stage receive their normal click. Capturing a
-      // button's pointer on the stage retargets the eventual click to the stage.
-      if (event.target.closest("button, a, input")) return;
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      elements.stage.setPointerCapture(event.pointerId);
-      view.pointers.set(event.pointerId, localPointer(event));
-      if (view.pointers.size === 1) beginPanGesture(event.pointerId);
-      else beginPinchGesture();
+    elements.resetZoomButton.addEventListener("click", resetView);
+    elements.stage.addEventListener("wheel", (event) => {
       event.preventDefault();
-    });
-
-    elements.stage.addEventListener("pointermove", (event) => {
-      if (!view.pointers.has(event.pointerId)) return;
-      view.pointers.set(event.pointerId, localPointer(event));
-
-      if (view.pointers.size >= 2) {
-        if (view.gesture?.type !== "pinch") beginPinchGesture();
-        const points = [...view.pointers.values()].slice(0, 2);
-        const [a, b] = points;
-        const middleX = (a.x + b.x) / 2;
-        const middleY = (a.y + b.y) / 2;
-        const distance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        const gesture = view.gesture;
-        if (gesture?.type === "pinch") {
-          const scale = clampScale(gesture.startScale * (distance / gesture.startDistance));
-          view.scale = scale;
-          view.x = middleX - gesture.worldX * scale;
-          view.y = middleY - gesture.worldY * scale;
-          applyViewTransform();
-        }
-      } else if (view.pointers.size === 1) {
-        const [pointerId, point] = view.pointers.entries().next().value;
-        if (view.gesture?.type !== "pan" || view.gesture.pointerId !== pointerId) {
-          beginPanGesture(pointerId);
-        }
-        const gesture = view.gesture;
-        if (gesture?.type === "pan") {
-          view.x = gesture.startX + point.x - gesture.startPointerX;
-          view.y = gesture.startY + point.y - gesture.startPointerY;
-          applyViewTransform();
-        }
-      }
-      event.preventDefault();
-    });
-
-    const endPointer = (event) => {
-      if (view.pointers.has(event.pointerId)) view.pointers.delete(event.pointerId);
-      if (view.pointers.size === 1) {
-        const pointerId = view.pointers.keys().next().value;
-        beginPanGesture(pointerId);
-      } else if (view.pointers.size >= 2) {
-        beginPinchGesture();
-      } else {
-        view.gesture = null;
-      }
-    };
+      zoomAt(Math.exp(-event.deltaY * 0.0012), event.clientX, event.clientY);
+    }, { passive: false });
+    elements.stage.addEventListener("pointerdown", beginPointer);
+    elements.stage.addEventListener("pointermove", movePointer);
     elements.stage.addEventListener("pointerup", endPointer);
     elements.stage.addEventListener("pointercancel", endPointer);
-    elements.stage.addEventListener("lostpointercapture", endPointer);
-
-    elements.chart.addEventListener("pointermove", (event) => {
-      if (event.pointerType === "touch") return;
-      const index = chartIndexAtClientX(event.clientX);
-      showChartTooltip(index, event.clientX, event.clientY);
+    elements.recordChart.addEventListener("pointermove", showChartTooltip);
+    elements.recordChart.addEventListener("pointerleave", hideChartTooltip);
+    elements.recordChart.addEventListener("click", (event) => {
+      const index = chartIndexFromEvent(event);
+      if (index >= 0) navigateTo(index);
     });
-    elements.chart.addEventListener("pointerleave", hideChartTooltip);
-    elements.chart.addEventListener("click", (event) => {
-      const index = chartIndexAtClientX(event.clientX);
-      if (index >= 0) selectRecord(index);
-      hideChartTooltip();
+    window.addEventListener("resize", () => {
+      drawChart();
+      requestStageFrame();
     });
-
     window.addEventListener("keydown", (event) => {
-      const tag = event.target?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "button" || tag === "a" || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      if (event.key === "ArrowLeft") {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+      if (event.code === "Space") {
         event.preventDefault();
-        selectRecord(state.selectedIndex - 1);
+        togglePlay();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        step(-1);
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        selectRecord(state.selectedIndex + 1);
+        step(1);
       } else if (event.key === "0") {
-        resetZoom();
+        resetView();
       }
     });
-
-    const chartResizeObserver = new ResizeObserver(() => drawChart());
-    chartResizeObserver.observe(elements.chartWrap);
-
-    const stageResizeObserver = new ResizeObserver(() => {
-      view.artworkBounds = null;
-      applyViewTransform();
-    });
-    stageResizeObserver.observe(elements.stage);
   }
 
-  async function initialise() {
-    let storedTheme = null;
+  async function loadCatalog() {
     try {
-      storedTheme = localStorage.getItem("unitDistanceAtlasTheme");
-    } catch {
-      // Default to dark mode when storage is unavailable.
+      return await fetchJson("data/catalog.local.json");
+    } catch (localError) {
+      console.info("Local catalog unavailable; loading published catalog.", localError);
+      return fetchJson("data/catalog.json");
     }
-    setTheme(storedTheme === "light" ? "light" : "dark", false);
-    bindEvents();
+  }
 
+  async function init() {
+    installEvents();
+    applyTheme(localStorage.getItem("unit-distance-theme") || "dark");
     try {
-      const catalog = await fetchCatalog();
-      state.records = [...(catalog.records ?? [])].sort((a, b) => a.n - b.n);
-      if (!state.records.length) {
-        throw new Error("The catalog contains no graph records. Run generate.py first.");
-      }
-
-      elements.nInput.min = String(state.records[0].n);
-      elements.nInput.max = String(state.records[state.records.length - 1].n);
+      state.catalog = await loadCatalog();
+      if (state.catalog.schemaVersion !== 2) throw new Error(`Unsupported schema version ${state.catalog.schemaVersion}`);
+      state.summaries = state.catalog.records;
+      if (!state.summaries.length) throw new Error("The catalog has no records.");
+      elements.nInput.min = state.summaries[0].n;
+      elements.nInput.max = state.summaries.at(-1).n;
+      elements.timeline.min = state.summaries[0].n;
+      elements.timeline.max = state.summaries.at(-1).n;
+      elements.rangeStart.textContent = numberFormat.format(state.summaries[0].n);
+      elements.rangeEnd.textContent = numberFormat.format(state.summaries.at(-1).n);
+      await navigateTo(0, { animate: false });
       drawChart();
-
-      const requestedN = Number.parseInt(new URL(window.location.href).searchParams.get("n") ?? "", 10);
-      const initialIndex = Number.isFinite(requestedN)
-        ? nearestRecordIndex(requestedN)
-        : state.records.length - 1;
-      await selectRecord(initialIndex, { updateUrl: !Number.isFinite(requestedN) });
     } catch (error) {
-      const fileHint = window.location.protocol === "file:"
-        ? " Browsers block local fetches from file:// URLs; run “python serve.py” and open the displayed http:// address."
-        : "";
-      showStageMessage(`Could not load an atlas catalog: ${error.message}.${fileHint}`);
       console.error(error);
+      showMessage(`Could not load the atlas. Run the generator and serve this directory over HTTP. ${error.message}`);
     }
   }
 
-  initialise();
+  init();
 })();
