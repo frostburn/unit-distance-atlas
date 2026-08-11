@@ -11,7 +11,13 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT))
 
-from generate import hilbert_mapping_with_replacements  # noqa: E402
+from generate import (  # noqa: E402
+    Candidate,
+    HostSpec,
+    RunArchive,
+    choose_sequence,
+    hilbert_mapping_with_replacements,
+)
 from known_optima import KNOWN_EXACT_EDGE_COUNTS  # noqa: E402
 
 
@@ -139,6 +145,29 @@ class JsonMotionAtlasTests(unittest.TestCase):
         self.assertEqual(len(pairs), 8)
         self.assertEqual(len(removed), 2)
         self.assertEqual(len(added), 3)
+
+    def test_sequence_prefers_the_more_consequential_cell_division(self) -> None:
+        specs = {
+            "pretty": HostSpec("pretty", "pretty", "explicit", "moser"),
+            "hex": HostSpec("hex", "hex", "explicit", "cyclotomic", m=6),
+        }
+        runs = {
+            name: RunArchive(name, spec, [], [-1], [], [], {})
+            for name, spec in specs.items()
+        }
+
+        def candidate(n: int, edges: int, run: str, aesthetic: float) -> Candidate:
+            spec = specs[run]
+            return Candidate(n, edges, run, spec.key, spec.family_key, f"{run}-{n}", aesthetic, 1, False)
+
+        layers = [
+            [],
+            [candidate(1, 0, "pretty", 1.0)],
+            [candidate(2, 1, "pretty", 1.0), candidate(2, 1, "hex", 0.0)],
+            [candidate(3, 4, "hex", 0.0)],
+        ]
+        sequence = choose_sequence(layers, runs, 3)
+        self.assertEqual(sequence[1].run_id, "hex")
 
     def test_z_incremental_search_never_regresses_edge_counts(self) -> None:
         self._run_generator(seed=20260810, reset=False)

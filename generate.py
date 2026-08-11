@@ -12,8 +12,9 @@ sequence that lexicographically:
 
 1. uses the best edge count known to this atlas at every n;
 2. maximizes one-vertex growth transitions;
-3. minimizes changes of host family;
-4. prefers visually balanced candidates among the remaining ties.
+3. maximizes the unit edges introduced by those divisions;
+4. minimizes changes of host family;
+5. prefers visually balanced candidates among the remaining ties.
 
 No SVG files are produced. The browser renders and animates records directly
 from ``data/records/NNNN.json``.
@@ -895,25 +896,31 @@ def simple_transition(
 def choose_sequence(layers: Sequence[Sequence[Candidate]], runs: dict[str, RunArchive], max_n: int) -> list[Candidate]:
     host_cache: dict[str, Host] = {}
     simple_cache: dict[tuple[str, int, str, int], bool] = {}
-    scores: list[tuple[int, int, int, int]] = [
-        (0, 0, int(candidate.aesthetic * 1_000_000), candidate.streak) for candidate in layers[1]
+    scores: list[tuple[int, int, int, int, int]] = [
+        (0, 0, 0, int(candidate.aesthetic * 1_000_000), candidate.streak) for candidate in layers[1]
     ]
     parents: list[list[int]] = [[] for _ in range(max_n + 1)]
     parents[1] = [-1] * len(layers[1])
 
     for n in range(2, max_n + 1):
-        next_scores: list[tuple[int, int, int, int]] = []
+        next_scores: list[tuple[int, int, int, int, int]] = []
         parent_row: list[int] = []
         for current in layers[n]:
-            best_score: tuple[int, int, int, int] | None = None
+            best_score: tuple[int, int, int, int, int] | None = None
             best_parent = -1
             for index, previous in enumerate(layers[n - 1]):
                 old = scores[index]
+                division = simple_transition(previous, current, runs, host_cache, simple_cache)
                 score = (
-                    old[0] + int(simple_transition(previous, current, runs, host_cache, simple_cache)),
-                    old[1] + int(previous.family_key == current.family_key),
-                    old[2] + int(current.aesthetic * 1_000_000),
-                    old[3] + current.streak,
+                    old[0] + int(division),
+                    # Prefer the most consequential divisions before judging
+                    # individual-frame symmetry. In particular, preserving the
+                    # three-edge 6 -> 7 hexagon division beats a prettier n=6
+                    # frame that must transmute into n=7.
+                    old[1] + (current.edges - previous.edges if division else 0),
+                    old[2] + int(previous.family_key == current.family_key),
+                    old[3] + int(current.aesthetic * 1_000_000),
+                    old[4] + current.streak,
                 )
                 if best_score is None or score > best_score:
                     best_score = score
@@ -1401,10 +1408,16 @@ def write_catalogs(root: Path, summaries: Sequence[dict[str, object]], sequence:
         "policy": [
             "strict record edge count",
             "maximum number of one-vertex growth transitions",
+            "maximum new unit edges introduced by those growth transitions",
             "minimum host-family changes",
             "visual balance among remaining ties",
         ],
         "growthTransitions": sum(1 for summary in summaries if summary.get("transition") == "growth"),
+        "growthEdgesIntroduced": sum(
+            int(summaries[index]["edges"]) - int(summaries[index - 1]["edges"])
+            for index in range(1, len(summaries))
+            if summaries[index].get("transition") == "growth"
+        ),
         "selection": [
             {
                 "n": candidate.n,

@@ -148,9 +148,15 @@ global dynamic-programming pass then chooses the strict-record movie path
 lexicographically by:
 
 1. number of genuine one-cell growth transitions;
-2. number of adjacent frames in the same host family;
-3. accumulated visual-balance score;
-4. accumulated record streak length.
+2. number of new unit edges introduced by those growth transitions;
+3. number of adjacent frames in the same host family;
+4. accumulated visual-balance score;
+5. accumulated record streak length.
+
+The second rule favors visually meaningful divisions over symmetry in an
+individual still. For example, when growth counts tie, it selects the
+incomplete six-cell hexagon that divides directly into the filled seven-cell
+hexagon rather than a more symmetric six-cell triforce that must transmute.
 
 This is deliberately different from independently choosing the prettiest frame
 at every `n`.
