@@ -50,7 +50,7 @@ X = sp.Symbol("x")
 MAX_N = 2_000
 PAD_WIDTH = 4
 SCHEMA_VERSION = 2
-GENERATOR_VERSION = "4.2"
+GENERATOR_VERSION = "4.3"
 MAX_CELL_DEATHS = 2
 MAX_CELL_DIVISIONS = MAX_CELL_DEATHS + 1
 DEFAULT_HOSTS = "hex,moser,z12,z18,z24,z30,z36,binary"
@@ -1148,6 +1148,23 @@ def choose_transmutation_alignment(previous: GraphData, current: GraphData) -> t
             translation = centroid(previous.coordinates) - centroid(linear)
             displayed = [point + translation for point in linear]
             displayed_normalized = normalized_points(displayed)
+            full_pairs, _, full_added, full_cost = hilbert_mapping_with_replacements(
+                previous_normalized, displayed_normalized, current.degrees, max_deaths=0
+            )
+            full_retained, _ = retained_edge_count(previous.edges, current.edges, full_pairs)
+            if full_retained == len(previous.edges):
+                # Graph containment is the strongest signal: never manufacture
+                # deaths when every old edge survives under a one-cell mapping.
+                # This also detects equivalent constructions expressed in
+                # different algebraic hosts, such as the n=5 -> 6 division.
+                item = (
+                    0, full_cost, Isometry(angle, reflect, translation),
+                    full_pairs, [], full_added, "growth",
+                )
+                if best is None or item[:2] < best[:2]:
+                    best = item
+                continue
+
             pairs, removed, added, cost = hilbert_mapping_with_replacements(
                 previous_normalized, displayed_normalized, current.degrees
             )
@@ -1161,7 +1178,7 @@ def choose_transmutation_alignment(previous: GraphData, current: GraphData) -> t
                     previous_normalized, displayed_normalized, current.degrees, max_deaths=0
                 )
             kind = "renewal" if renewal else "transmutation"
-            item = (0 if renewal else 1, cost, Isometry(angle, reflect, translation), pairs, removed, added, kind)
+            item = (1 if renewal else 2, cost, Isometry(angle, reflect, translation), pairs, removed, added, kind)
             if best is None or item[:2] < best[:2]:
                 best = item
     assert best is not None

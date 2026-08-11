@@ -102,6 +102,11 @@ When the strict record for `n + 1` contains the selected `n` graph:
 
 The old edge set remains visible throughout.
 
+Containment is checked before cell renewal, including between drawings from
+different algebraic hosts. If one additional cell preserves every old edge,
+the transition is always a single division; the spatial matcher is not allowed
+to replace that division with unnecessary deaths.
+
 ### Cell renewal
 
 When removing at most two cells leaves all edges between the surviving cells

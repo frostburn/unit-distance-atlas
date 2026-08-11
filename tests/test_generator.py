@@ -121,11 +121,12 @@ class JsonMotionAtlasTests(unittest.TestCase):
                 for offset in range(0, len(old_edges), 2):
                     mapped = tuple(sorted((mapping[old_edges[offset]], mapping[old_edges[offset + 1]])))
                     self.assertIn(mapped, current_edge_set)
-                old_coords = previous["geometry"]["coordinates"]
-                new_coords = current["geometry"]["coordinates"]
-                for old_index, new_index in enumerate(mapping):
-                    self.assertAlmostEqual(old_coords[old_index][0], new_coords[new_index][0], places=8)
-                    self.assertAlmostEqual(old_coords[old_index][1], new_coords[new_index][1], places=8)
+                if transition["mappingCost"] is None:
+                    old_coords = previous["geometry"]["coordinates"]
+                    new_coords = current["geometry"]["coordinates"]
+                    for old_index, new_index in enumerate(mapping):
+                        self.assertAlmostEqual(old_coords[old_index][0], new_coords[new_index][0], places=8)
+                        self.assertAlmostEqual(old_coords[old_index][1], new_coords[new_index][1], places=8)
             elif transition["kind"] == "renewal":
                 old_edges = previous["geometry"]["edges"]
                 old_edge_pairs = [
@@ -150,6 +151,11 @@ class JsonMotionAtlasTests(unittest.TestCase):
                 expected_y = sum(coords[i][1] for i in neighbours) / len(neighbours)
                 self.assertAlmostEqual(spawn["position"][0], expected_x, places=8)
                 self.assertAlmostEqual(spawn["position"][1], expected_y, places=8)
+
+        five_to_six = self.records[5]["transition"]
+        self.assertEqual(five_to_six["kind"], "growth")
+        self.assertFalse(five_to_six["removedVertices"])
+        self.assertEqual(len(five_to_six["addedVertices"]), 1)
 
     def test_hilbert_mapping_can_replace_two_outlying_cells(self) -> None:
         source = [complex(index / 20, 0) for index in range(8)] + [10 + 0j, 11 + 0j]
