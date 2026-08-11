@@ -11,6 +11,7 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT))
 
+from generate import hilbert_mapping_with_replacements  # noqa: E402
 from known_optima import KNOWN_EXACT_EDGE_COUNTS  # noqa: E402
 
 
@@ -89,12 +90,16 @@ class JsonMotionAtlasTests(unittest.TestCase):
             transition = current["transition"]
             self.assertEqual(transition["from"], previous["n"])
             self.assertIn(transition["kind"], {"growth", "transmutation"})
-            mapping = transition["oldToNew"]
-            added = transition["addedVertex"]
-            self.assertEqual(len(mapping), previous["n"])
-            self.assertEqual(len(set(mapping)), len(mapping))
-            self.assertTrue(all(0 <= value < current["n"] for value in mapping))
-            self.assertNotIn(added, mapping)
+            pairs = transition["retainedPairs"]
+            removed = transition["removedVertices"]
+            added = transition["addedVertices"]
+            self.assertLessEqual(len(removed), 2)
+            self.assertEqual(len(added), len(removed) + 1)
+            self.assertLessEqual(len(added), 3)
+            self.assertEqual(len(pairs) + len(removed), previous["n"])
+            self.assertEqual(len(pairs) + len(added), current["n"])
+            self.assertEqual(len({pair[0] for pair in pairs}), len(pairs))
+            self.assertEqual(len({pair[1] for pair in pairs}), len(pairs))
 
             current_edges = current["geometry"]["edges"]
             current_edge_set = {
@@ -102,6 +107,8 @@ class JsonMotionAtlasTests(unittest.TestCase):
                 for offset in range(0, len(current_edges), 2)
             }
             if transition["kind"] == "growth":
+                mapping = transition["oldToNew"]
+                self.assertFalse(removed)
                 self.assertEqual(transition["retainedEdges"], previous["edges"])
                 old_edges = previous["geometry"]["edges"]
                 for offset in range(0, len(old_edges), 2):
@@ -115,13 +122,23 @@ class JsonMotionAtlasTests(unittest.TestCase):
             else:
                 self.assertEqual(transition["retainedEdges"], 0)
 
-            neighbours = transition["spawnNeighbors"]
-            if neighbours:
+            for spawn in transition["spawns"]:
+                neighbours = spawn["neighbors"]
+                if not neighbours:
+                    continue
                 coords = current["geometry"]["coordinates"]
                 expected_x = sum(coords[i][0] for i in neighbours) / len(neighbours)
                 expected_y = sum(coords[i][1] for i in neighbours) / len(neighbours)
-                self.assertAlmostEqual(transition["spawn"][0], expected_x, places=8)
-                self.assertAlmostEqual(transition["spawn"][1], expected_y, places=8)
+                self.assertAlmostEqual(spawn["position"][0], expected_x, places=8)
+                self.assertAlmostEqual(spawn["position"][1], expected_y, places=8)
+
+    def test_hilbert_mapping_can_replace_two_outlying_cells(self) -> None:
+        source = [complex(index / 20, 0) for index in range(8)] + [10 + 0j, 11 + 0j]
+        target = [complex(index / 20, 0) for index in range(8)] + [20 + 0j, 21 + 0j, 22 + 0j]
+        pairs, removed, added, _ = hilbert_mapping_with_replacements(source, target, [0] * len(target))
+        self.assertEqual(len(pairs), 8)
+        self.assertEqual(len(removed), 2)
+        self.assertEqual(len(added), 3)
 
     def test_z_incremental_search_never_regresses_edge_counts(self) -> None:
         self._run_generator(seed=20260810, reset=False)

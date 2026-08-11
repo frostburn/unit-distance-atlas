@@ -290,25 +290,26 @@
     const transitionRecord = direction > 0 ? target : source;
     const transition = transitionRecord.transition;
     if (!transition || Math.abs(source.n - target.n) !== 1) return null;
-    const oldToNew = transition.oldToNew.map(Number);
-    const pairs = [];
+    const retainedPairs = transition.retainedPairs
+      ? transition.retainedPairs.map(([oldIndex, newIndex]) => [Number(oldIndex), Number(newIndex)])
+      : transition.oldToNew.map((newIndex, oldIndex) => [oldIndex, Number(newIndex)]);
+    const removed = (transition.removedVertices || []).map(Number);
+    const added = (transition.addedVertices || [transition.addedVertex]).filter((value) => value != null).map(Number);
     if (direction > 0) {
-      oldToNew.forEach((targetIndex, sourceIndex) => pairs.push([sourceIndex, targetIndex]));
       return {
         kind: transition.kind,
         transition,
-        pairs,
-        extraSource: [],
-        extraTarget: [Number(transition.addedVertex)],
+        pairs: retainedPairs,
+        extraSource: removed,
+        extraTarget: added,
       };
     }
-    oldToNew.forEach((sourceIndex, targetIndex) => pairs.push([sourceIndex, targetIndex]));
     return {
       kind: transition.kind,
       transition,
-      pairs,
-      extraSource: [Number(transition.addedVertex)],
-      extraTarget: [],
+      pairs: retainedPairs.map(([oldIndex, newIndex]) => [newIndex, oldIndex]),
+      extraSource: added,
+      extraTarget: removed,
     };
   }
 
@@ -388,9 +389,11 @@
       const by = target.coordinates[2 * targetIndex + 1];
       let sx = targetCenter[0];
       let sy = targetCenter[1];
-      if (transition?.spawn && Math.abs(source.n - target.n) === 1) {
-        sx = Number(transition.spawn[0]);
-        sy = Number(transition.spawn[1]);
+      const spawn = transition?.spawns?.find((item) => Number(item.vertex) === targetIndex)?.position
+        || (transition?.addedVertex === targetIndex ? transition.spawn : null);
+      if (spawn && animation.direction > 0) {
+        sx = Number(spawn[0]);
+        sy = Number(spawn[1]);
       }
       const birthStart = kind === "growth" ? 0.02 : 0.46;
       const birthT = smoothstep(birthStart, 0.96, progress);
@@ -538,12 +541,14 @@
     if (animation.kind === "growth") {
       if (animation.direction > 0) {
         drawEdgeSet(ctx, animation.source, sourceScreen, 1, style, metrics.dpr);
-        const added = animation.extraTarget[0];
-        drawIncidentEdges(ctx, animation.target, targetScreen, added, smoothstep(0.18, 0.92, progress), style, metrics.dpr);
+        animation.extraTarget.forEach((added) => {
+          drawIncidentEdges(ctx, animation.target, targetScreen, added, smoothstep(0.18, 0.92, progress), style, metrics.dpr);
+        });
       } else {
         drawEdgeSet(ctx, animation.target, targetScreen, 1, style, metrics.dpr);
-        const disappearing = animation.extraSource[0];
-        drawIncidentEdges(ctx, animation.source, sourceScreen, disappearing, 1 - smoothstep(0.08, 0.82, progress), style, metrics.dpr);
+        animation.extraSource.forEach((disappearing) => {
+          drawIncidentEdges(ctx, animation.source, sourceScreen, disappearing, 1 - smoothstep(0.08, 0.82, progress), style, metrics.dpr);
+        });
       }
     } else {
       const metadata = animation.transition?.animation || {};
@@ -556,9 +561,12 @@
     drawNodes(ctx, baseNodes, style, metrics.dpr);
     drawSpecialNodes(ctx, specialNodes, style, metrics.dpr, progress);
 
-    if (animation.kind === "growth" && animation.transition?.spawnNeighbors?.length) {
-      // spawnNeighbors are indices in the larger record in both directions.
-      const neighborIndices = animation.transition.spawnNeighbors;
+    const spawnNeighbors = animation.transition?.spawns
+      ? animation.transition.spawns.flatMap((spawn) => spawn.neighbors || [])
+      : animation.transition?.spawnNeighbors || [];
+    if (animation.kind === "growth" && spawnNeighbors.length) {
+      // Spawn neighbours are indices in the larger record in both directions.
+      const neighborIndices = [...new Set(spawnNeighbors)];
       const sourceArray = animation.direction > 0 ? targetScreen : sourceScreen;
       const pulse = Math.sin(Math.PI * smoothstep(0, 0.72, progress));
       if (pulse > 0.01) {
@@ -589,7 +597,11 @@
       const elapsed = now - state.animation.startedAt;
       const progress = clamp(0, elapsed / state.animation.duration, 1);
       renderAnimation(state.animation, progress, ctx, metrics);
-      elements.transitionBadge.textContent = state.animation.kind === "growth" ? "cell division" : "transmutation";
+      const deaths = state.animation.transition?.removedVertices?.length || 0;
+      const divisions = state.animation.transition?.addedVertices?.length || 1;
+      elements.transitionBadge.textContent = deaths
+        ? `${deaths} cell death${deaths === 1 ? "" : "s"} · ${divisions} divisions`
+        : "cell division";
       if (progress >= 1) finishAnimation(now);
     } else if (state.currentRecord) {
       renderStatic(state.currentRecord, ctx, metrics);

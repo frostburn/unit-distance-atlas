@@ -107,8 +107,9 @@ The old edge set remains visible throughout.
 When strict records cannot be related by one added vertex:
 
 1. the old edges fade completely;
-2. cells migrate along gently curved paths using the stored old-to-new mapping;
-3. the extra cell appears during migration;
+2. cells migrate along gently curved paths using the stored retained pairs;
+3. up to two poorly matched old cells die while up to three replacement cells
+   divide into the new drawing;
 4. only near the end do the new record edges fade in.
 
 Thus a host change reads as a deliberate reorganization rather than as a jump
@@ -201,10 +202,10 @@ A record contains:
   "host": { "family": "moser" },
   "transition": {
     "kind": "growth",
-    "oldToNew": [0, 1, 2],
-    "addedVertex": 1177,
-    "spawn": [0.0, 0.0],
-    "spawnNeighbors": [12, 47, 301]
+    "retainedPairs": [[0, 0], [1, 1], [2, 2]],
+    "removedVertices": [],
+    "addedVertices": [1177],
+    "spawns": [{"vertex": 1177, "position": [0.0, 0.0], "neighbors": [12, 47, 301]}]
   },
   "geometry": {
     "coordinates": [[0.0, 0.0]],
