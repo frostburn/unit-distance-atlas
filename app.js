@@ -597,11 +597,15 @@
       const elapsed = now - state.animation.startedAt;
       const progress = clamp(0, elapsed / state.animation.duration, 1);
       renderAnimation(state.animation, progress, ctx, metrics);
-      const deaths = state.animation.transition?.removedVertices?.length || 0;
-      const divisions = state.animation.transition?.addedVertices?.length || 1;
-      elements.transitionBadge.textContent = deaths
-        ? `${deaths} cell death${deaths === 1 ? "" : "s"} · ${divisions} divisions`
-        : "cell division";
+      if (state.animation.kind === "growth") {
+        elements.transitionBadge.textContent = "cell division";
+      } else {
+        const deaths = state.animation.transition?.removedVertices?.length || 0;
+        const divisions = state.animation.transition?.addedVertices?.length || 0;
+        elements.transitionBadge.textContent = deaths
+          ? `transmutation · ${deaths} death${deaths === 1 ? "" : "s"} · ${divisions} divisions`
+          : "transmutation";
+      }
       if (progress >= 1) finishAnimation(now);
     } else if (state.currentRecord) {
       renderStatic(state.currentRecord, ctx, metrics);
