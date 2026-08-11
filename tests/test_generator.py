@@ -17,6 +17,7 @@ from generate import (  # noqa: E402
     RunArchive,
     choose_sequence,
     hilbert_mapping_with_replacements,
+    retained_edge_count,
 )
 from known_optima import KNOWN_EXACT_EDGE_COUNTS  # noqa: E402
 
@@ -95,7 +96,7 @@ class JsonMotionAtlasTests(unittest.TestCase):
             current = self.records[index]
             transition = current["transition"]
             self.assertEqual(transition["from"], previous["n"])
-            self.assertIn(transition["kind"], {"growth", "transmutation"})
+            self.assertIn(transition["kind"], {"growth", "renewal", "transmutation"})
             pairs = transition["retainedPairs"]
             removed = transition["removedVertices"]
             added = transition["addedVertices"]
@@ -125,7 +126,19 @@ class JsonMotionAtlasTests(unittest.TestCase):
                 for old_index, new_index in enumerate(mapping):
                     self.assertAlmostEqual(old_coords[old_index][0], new_coords[new_index][0], places=8)
                     self.assertAlmostEqual(old_coords[old_index][1], new_coords[new_index][1], places=8)
+            elif transition["kind"] == "renewal":
+                old_edges = previous["geometry"]["edges"]
+                old_edge_pairs = [
+                    (old_edges[offset], old_edges[offset + 1])
+                    for offset in range(0, len(old_edges), 2)
+                ]
+                retained, surviving = retained_edge_count(old_edge_pairs, current_edge_set, pairs)
+                self.assertEqual(retained, surviving)
+                self.assertEqual(transition["retainedEdges"], retained)
+                self.assertGreater(2 * retained, previous["edges"])
             else:
+                self.assertFalse(removed)
+                self.assertEqual(len(added), 1)
                 self.assertEqual(transition["retainedEdges"], 0)
 
             for spawn in transition["spawns"]:

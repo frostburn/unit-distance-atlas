@@ -50,7 +50,7 @@ X = sp.Symbol("x")
 MAX_N = 2_000
 PAD_WIDTH = 4
 SCHEMA_VERSION = 2
-GENERATOR_VERSION = "4.1"
+GENERATOR_VERSION = "4.2"
 MAX_CELL_DEATHS = 2
 MAX_CELL_DIVISIONS = MAX_CELL_DEATHS + 1
 DEFAULT_HOSTS = "hex,moser,z12,z18,z24,z30,z36,binary"
@@ -1029,7 +1029,11 @@ def space_filling_order(points: Sequence[complex], combined_bounds: tuple[float,
 
 
 def hilbert_mapping_with_replacements(
-    source: Sequence[complex], target: Sequence[complex], target_degrees: Sequence[int]
+    source: Sequence[complex],
+    target: Sequence[complex],
+    target_degrees: Sequence[int],
+    *,
+    max_deaths: int = MAX_CELL_DEATHS,
 ) -> tuple[list[tuple[int, int]], list[int], list[int], float]:
     """Spatially match adjacent frames, allowing a small amount of cell renewal.
 
@@ -1079,11 +1083,11 @@ def hilbert_mapping_with_replacements(
                 next_state = (i + 1, j + 1, deaths, divisions)
                 next_cost = cost + abs(source[source_order[i]] - target[target_order[j]]) ** 2
                 relax(state, next_state, next_cost, "match")
-            if i < len(source) and deaths < MAX_CELL_DEATHS:
+            if i < len(source) and deaths < max_deaths:
                 next_state = (i + 1, j, deaths + 1, divisions)
                 next_cost = cost + skip_cost
                 relax(state, next_state, next_cost, "death")
-            if j < len(target) and divisions < MAX_CELL_DIVISIONS:
+            if j < len(target) and divisions < min(MAX_CELL_DIVISIONS, max_deaths + 1):
                 next_state = (i, j + 1, deaths, divisions + 1)
                 next_cost = cost + skip_cost + target_degrees[target_order[j]] * 1e-5
                 relax(state, next_state, next_cost, "division")
@@ -1113,12 +1117,27 @@ def hilbert_mapping_with_replacements(
     return pairs, removed, added, costs[best] / max(1, len(pairs))
 
 
-def choose_transmutation_alignment(previous_coordinates: Sequence[complex], current: GraphData) -> tuple[Isometry, list[tuple[int, int]], list[int], list[int], float]:
-    previous_normalized = normalized_points(previous_coordinates)
-    previous_angle = principal_angle(previous_coordinates)
+def retained_edge_count(
+    previous_edges: Sequence[tuple[int, int]],
+    current_edges: Sequence[tuple[int, int]],
+    pairs: Sequence[tuple[int, int]],
+) -> tuple[int, int]:
+    mapping = dict(pairs)
+    current_set = {tuple(sorted(edge)) for edge in current_edges}
+    surviving = [(a, b) for a, b in previous_edges if a in mapping and b in mapping]
+    retained = sum(
+        tuple(sorted((mapping[a], mapping[b]))) in current_set
+        for a, b in surviving
+    )
+    return retained, len(surviving)
+
+
+def choose_transmutation_alignment(previous: GraphData, current: GraphData) -> tuple[Isometry, list[tuple[int, int]], list[int], list[int], float, str]:
+    previous_normalized = normalized_points(previous.coordinates)
+    previous_angle = principal_angle(previous.coordinates)
     raw_principal = principal_angle(current.raw_coordinates)
 
-    best: tuple[float, Isometry, list[tuple[int, int]], list[int], list[int]] | None = None
+    best: tuple[int, float, Isometry, list[tuple[int, int]], list[int], list[int], str] | None = None
     for reflect in (False, True):
         reflected_principal = -raw_principal if reflect else raw_principal
         base = previous_angle - reflected_principal
@@ -1126,17 +1145,27 @@ def choose_transmutation_alignment(previous_coordinates: Sequence[complex], curr
             angle = base + step * math.pi / 6
             unit = cmath.exp(1j * angle)
             linear = [((point.conjugate() if reflect else point) * unit) for point in current.raw_coordinates]
-            translation = centroid(previous_coordinates) - centroid(linear)
+            translation = centroid(previous.coordinates) - centroid(linear)
             displayed = [point + translation for point in linear]
             displayed_normalized = normalized_points(displayed)
             pairs, removed, added, cost = hilbert_mapping_with_replacements(
                 previous_normalized, displayed_normalized, current.degrees
             )
-            item = (cost, Isometry(angle, reflect, translation), pairs, removed, added)
-            if best is None or item[0] < best[0]:
+            retained, surviving = retained_edge_count(previous.edges, current.edges, pairs)
+            renewal = bool(removed) and retained == surviving and retained * 2 > len(previous.edges)
+            if removed and not renewal:
+                # Death is only meaningful when the remaining graph stays
+                # visibly intact. Otherwise use an ordinary transmutation with
+                # every old cell mapped and no misleading death animation.
+                pairs, removed, added, cost = hilbert_mapping_with_replacements(
+                    previous_normalized, displayed_normalized, current.degrees, max_deaths=0
+                )
+            kind = "renewal" if renewal else "transmutation"
+            item = (0 if renewal else 1, cost, Isometry(angle, reflect, translation), pairs, removed, added, kind)
+            if best is None or item[:2] < best[:2]:
                 best = item
     assert best is not None
-    return best[1], best[2], best[3], best[4], best[0]
+    return best[2], best[3], best[4], best[5], best[1], best[6]
 
 
 def exact_simple_alignment(previous: GraphData, current: GraphData, previous_transform: Isometry) -> tuple[Isometry, list[int], int] | None:
@@ -1261,6 +1290,10 @@ def transition_for_pair(
         if not mapped_edges_preserved(previous.edges, current.edges, mapping):
             raise AssertionError(f"n={current.candidate.n}: growth did not retain all old edges")
         retained_edges = len(previous.edges)
+    elif kind == "renewal":
+        retained_edges, surviving_edges = retained_edge_count(previous.edges, current.edges, pairs)
+        if retained_edges != surviving_edges:
+            raise AssertionError(f"n={current.candidate.n}: renewal did not retain the surviving old edges")
     return {
         "from": previous.candidate.n,
         "kind": kind,
@@ -1358,8 +1391,7 @@ def materialize_sequence(
                 added = [added_vertex]
                 kind = "growth"
             else:
-                transform, pairs, removed, added, mapping_cost = choose_transmutation_alignment(previous_graph.coordinates, graph)
-                kind = "transmutation"
+                transform, pairs, removed, added, mapping_cost, kind = choose_transmutation_alignment(previous_graph, graph)
 
         graph.coordinates = apply_isometry(graph.raw_coordinates, transform)
         transition = transition_for_pair(previous_graph, graph, pairs, removed, added, kind, mapping_cost)

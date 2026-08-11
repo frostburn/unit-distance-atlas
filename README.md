@@ -102,14 +102,28 @@ When the strict record for `n + 1` contains the selected `n` graph:
 
 The old edge set remains visible throughout.
 
+### Cell renewal
+
+When removing at most two cells leaves all edges between the surviving cells
+present in the next record:
+
+1. those retained cells and edges remain continuously visible;
+2. up to two cells die with only their incident edges disappearing;
+3. up to three replacement cells divide into the new drawing;
+4. new edges grow in without blanking the graph.
+
+Cell death is never used merely to improve a spatial assignment. More than half
+of the old edge set must survive, and every edge whose endpoints survive must
+still exist after mapping; otherwise the transition keeps every cell and uses
+a transmutation.
+
 ### Transmutation
 
-When strict records cannot be related by one added vertex:
+When neither growth nor structure-preserving renewal is possible:
 
 1. the old edges fade completely;
-2. cells migrate along gently curved paths using the stored retained pairs;
-3. up to two poorly matched old cells die while up to three replacement cells
-   divide into the new drawing;
+2. every old cell migrates along a gently curved path;
+3. the one additional cell appears during migration;
 4. only near the end do the new record edges fade in.
 
 Thus a host change reads as a deliberate reorganization rather than as a jump

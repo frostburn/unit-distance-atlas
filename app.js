@@ -295,6 +295,11 @@
       : transition.oldToNew.map((newIndex, oldIndex) => [oldIndex, Number(newIndex)]);
     const removed = (transition.removedVertices || []).map(Number);
     const added = (transition.addedVertices || [transition.addedVertex]).filter((value) => value != null).map(Number);
+    // Records produced before renewal validation could attach deaths to a
+    // transmutation. Ignore that partial mapping and remap every cell instead;
+    // transmutation must never visually masquerade as structure-preserving
+    // death and division.
+    if (transition.kind === "transmutation" && removed.length) return null;
     if (direction > 0) {
       return {
         kind: transition.kind,
@@ -352,7 +357,8 @@
     const animationMetadata = transition?.animation || {};
     const migrationStart = Number(animationMetadata.migrationStart ?? 0.16);
     const migrationEnd = Number(animationMetadata.migrationEnd ?? 0.82);
-    const migrationT = kind === "growth"
+    const keepsStructure = kind === "growth" || kind === "renewal";
+    const migrationT = keepsStructure
       ? easeInOutCubic(progress)
       : easeInOutCubic(smoothstep(migrationStart, migrationEnd, progress));
 
@@ -363,7 +369,7 @@
       const by = target.coordinates[2 * targetIndex + 1];
       let x;
       let y;
-      if (kind === "growth") {
+      if (keepsStructure) {
         x = lerp(ax, bx, migrationT);
         y = lerp(ay, by, migrationT);
       } else {
@@ -377,7 +383,7 @@
     extraSource.forEach((sourceIndex, rank) => {
       const ax = source.coordinates[2 * sourceIndex];
       const ay = source.coordinates[2 * sourceIndex + 1];
-      const vanishT = kind === "growth" ? smoothstep(0.05, 0.86, progress) : smoothstep(0.12, 0.72, progress);
+      const vanishT = keepsStructure ? smoothstep(0.05, 0.86, progress) : smoothstep(0.12, 0.72, progress);
       const x = lerp(ax, sourceCenter[0], 0.18 * vanishT);
       const y = lerp(ay, sourceCenter[1], 0.18 * vanishT);
       setPoint(sourcePositions, sourceIndex, x, y);
@@ -395,9 +401,9 @@
         sx = Number(spawn[0]);
         sy = Number(spawn[1]);
       }
-      const birthStart = kind === "growth" ? 0.02 : 0.46;
+      const birthStart = keepsStructure ? 0.02 : 0.46;
       const birthT = smoothstep(birthStart, 0.96, progress);
-      const pushed = kind === "growth" ? spring(birthT) : easeInOutCubic(birthT);
+      const pushed = keepsStructure ? spring(birthT) : easeInOutCubic(birthT);
       const x = lerp(sx, bx, pushed);
       const y = lerp(sy, by, pushed);
       setPoint(targetPositions, targetIndex, x, y);
@@ -550,6 +556,12 @@
           drawIncidentEdges(ctx, animation.source, sourceScreen, disappearing, 1 - smoothstep(0.08, 0.82, progress), style, metrics.dpr);
         });
       }
+    } else if (animation.kind === "renewal") {
+      // Crossfade coincident retained edges without ever blanking the graph;
+      // only edges incident to dying/born cells visibly disappear or grow.
+      const blend = easeInOutCubic(progress);
+      drawEdgeSet(ctx, animation.source, sourceScreen, 1 - blend, style, metrics.dpr);
+      drawEdgeSet(ctx, animation.target, targetScreen, blend, style, metrics.dpr);
     } else {
       const metadata = animation.transition?.animation || {};
       const fadeOutEnd = Number(metadata.edgeFadeOutEnd ?? 0.20);
@@ -564,7 +576,7 @@
     const spawnNeighbors = animation.transition?.spawns
       ? animation.transition.spawns.flatMap((spawn) => spawn.neighbors || [])
       : animation.transition?.spawnNeighbors || [];
-    if (animation.kind === "growth" && spawnNeighbors.length) {
+    if ((animation.kind === "growth" || animation.kind === "renewal") && spawnNeighbors.length) {
       // Spawn neighbours are indices in the larger record in both directions.
       const neighborIndices = [...new Set(spawnNeighbors)];
       const sourceArray = animation.direction > 0 ? targetScreen : sourceScreen;
@@ -599,6 +611,10 @@
       renderAnimation(state.animation, progress, ctx, metrics);
       if (state.animation.kind === "growth") {
         elements.transitionBadge.textContent = "cell division";
+      } else if (state.animation.kind === "renewal") {
+        const deaths = state.animation.transition.removedVertices.length;
+        const divisions = state.animation.transition.addedVertices.length;
+        elements.transitionBadge.textContent = `${deaths} death${deaths === 1 ? "" : "s"} · ${divisions} divisions`;
       } else {
         const deaths = state.animation.transition?.removedVertices?.length || 0;
         const divisions = state.animation.transition?.addedVertices?.length || 0;
@@ -641,7 +657,11 @@
     elements.averageDegree.textContent = decimalFormat.format(record.averageDegree);
     elements.hostName.textContent = record.host?.label || summary.host || "—";
     const arrival = arrivalOverride || record.transition?.kind || (record.n === 1 ? "origin" : "loaded");
-    elements.arrivalType.textContent = arrival === "growth" ? "Cell division" : arrival === "transmutation" ? "Transmutation" : arrival;
+    elements.arrivalType.textContent = arrival === "growth"
+      ? "Cell division"
+      : arrival === "renewal"
+        ? "Cell renewal"
+        : arrival === "transmutation" ? "Transmutation" : arrival;
     elements.metadataLink.href = summary.record;
     elements.hudN.textContent = `n = ${numberFormat.format(record.n)}`;
     elements.hudEdges.textContent = `${numberFormat.format(record.edges)} edges`;
