@@ -12,8 +12,9 @@ sequence that lexicographically:
 
 1. uses the best edge count known to this atlas at every n;
 2. maximizes one-vertex growth transitions;
-3. minimizes changes of host family;
-4. prefers visually balanced candidates among the remaining ties.
+3. maximizes the unit edges introduced by those divisions;
+4. minimizes changes of host family;
+5. prefers visually balanced candidates among the remaining ties.
 
 No SVG files are produced. The browser renders and animates records directly
 from ``data/records/NNNN.json``.
@@ -49,7 +50,9 @@ X = sp.Symbol("x")
 MAX_N = 2_000
 PAD_WIDTH = 4
 SCHEMA_VERSION = 2
-GENERATOR_VERSION = "4.0"
+GENERATOR_VERSION = "4.3"
+MAX_CELL_DEATHS = 2
+MAX_CELL_DIVISIONS = MAX_CELL_DEATHS + 1
 DEFAULT_HOSTS = "hex,moser,z12,z18,z24,z30,z36,binary"
 
 
@@ -893,25 +896,31 @@ def simple_transition(
 def choose_sequence(layers: Sequence[Sequence[Candidate]], runs: dict[str, RunArchive], max_n: int) -> list[Candidate]:
     host_cache: dict[str, Host] = {}
     simple_cache: dict[tuple[str, int, str, int], bool] = {}
-    scores: list[tuple[int, int, int, int]] = [
-        (0, 0, int(candidate.aesthetic * 1_000_000), candidate.streak) for candidate in layers[1]
+    scores: list[tuple[int, int, int, int, int]] = [
+        (0, 0, 0, int(candidate.aesthetic * 1_000_000), candidate.streak) for candidate in layers[1]
     ]
     parents: list[list[int]] = [[] for _ in range(max_n + 1)]
     parents[1] = [-1] * len(layers[1])
 
     for n in range(2, max_n + 1):
-        next_scores: list[tuple[int, int, int, int]] = []
+        next_scores: list[tuple[int, int, int, int, int]] = []
         parent_row: list[int] = []
         for current in layers[n]:
-            best_score: tuple[int, int, int, int] | None = None
+            best_score: tuple[int, int, int, int, int] | None = None
             best_parent = -1
             for index, previous in enumerate(layers[n - 1]):
                 old = scores[index]
+                division = simple_transition(previous, current, runs, host_cache, simple_cache)
                 score = (
-                    old[0] + int(simple_transition(previous, current, runs, host_cache, simple_cache)),
-                    old[1] + int(previous.family_key == current.family_key),
-                    old[2] + int(current.aesthetic * 1_000_000),
-                    old[3] + current.streak,
+                    old[0] + int(division),
+                    # Prefer the most consequential divisions before judging
+                    # individual-frame symmetry. In particular, preserving the
+                    # three-edge 6 -> 7 hexagon division beats a prettier n=6
+                    # frame that must transmute into n=7.
+                    old[1] + (current.edges - previous.edges if division else 0),
+                    old[2] + int(previous.family_key == current.family_key),
+                    old[3] + int(current.aesthetic * 1_000_000),
+                    old[4] + current.streak,
                 )
                 if best_score is None or score > best_score:
                     best_score = score
@@ -1019,14 +1028,21 @@ def space_filling_order(points: Sequence[complex], combined_bounds: tuple[float,
     return [index for _, _, index in keyed]
 
 
-def hilbert_mapping_one_extra(
-    source: Sequence[complex], target: Sequence[complex], target_degrees: Sequence[int]
-) -> tuple[list[int], int, float]:
-    """Order-preserving spatial assignment with exactly one omitted target.
+def hilbert_mapping_with_replacements(
+    source: Sequence[complex],
+    target: Sequence[complex],
+    target_degrees: Sequence[int],
+    *,
+    max_deaths: int = MAX_CELL_DEATHS,
+) -> tuple[list[tuple[int, int]], list[int], list[int], float]:
+    """Spatially match adjacent frames, allowing a small amount of cell renewal.
 
-    Both point sets are put in Hilbert-curve order.  Prefix/suffix sums test all
-    possible positions of the one extra target in O(n), rather than rebuilding
-    and sorting the target for every omission candidate.
+    The target has one more point, so dropping ``d`` old cells necessarily
+    introduces ``d + 1`` new cells.  A narrow dynamic-programming alignment of
+    the Hilbert orders considers zero through two deaths (and therefore one
+    through three divisions).  The skip cost prevents needless replacement,
+    while allowing obvious long-distance matches to become local deaths and
+    births instead.
     """
     if len(target) != len(source) + 1:
         raise ValueError("Hilbert one-extra mapping requires target size source+1")
@@ -1039,34 +1055,89 @@ def hilbert_mapping_one_extra(
     )
     source_order = space_filling_order(source, combined_bounds)
     target_order = space_filling_order(target, combined_bounds)
-    n = len(source)
+    # A skip costs about the same as moving a cell one fifth of the normalized
+    # drawing width. New high-degree cells get a tiny preference as divisions.
+    skip_cost = 0.04
+    start = (0, 0, 0, 0)
+    costs = {start: 0.0}
+    parents: dict[tuple[int, int, int, int], tuple[tuple[int, int, int, int], str]] = {}
+    layers: list[set[tuple[int, int, int, int]]] = [set() for _ in range(len(source) + len(target) + 1)]
+    layers[0].add(start)
 
-    prefix = [0.0] * (n + 1)
-    for rank in range(n):
-        prefix[rank + 1] = prefix[rank] + abs(source[source_order[rank]] - target[target_order[rank]]) ** 2
-    suffix = [0.0] * (n + 1)
-    for rank in range(n - 1, -1, -1):
-        suffix[rank] = suffix[rank + 1] + abs(source[source_order[rank]] - target[target_order[rank + 1]]) ** 2
+    def relax(
+        state: tuple[int, int, int, int],
+        next_state: tuple[int, int, int, int],
+        next_cost: float,
+        operation: str,
+    ) -> None:
+        if next_cost < costs.get(next_state, math.inf):
+            costs[next_state] = next_cost
+            parents[next_state] = (state, operation)
+            layers[next_state[0] + next_state[1]].add(next_state)
 
-    best_skip = min(
-        range(n + 1),
-        key=lambda skip: prefix[skip] + suffix[skip] + target_degrees[target_order[skip]] * 1e-5,
+    for total in range(len(source) + len(target) + 1):
+        for state in layers[total]:
+            cost = costs[state]
+            i, j, deaths, divisions = state
+            if i < len(source) and j < len(target):
+                next_state = (i + 1, j + 1, deaths, divisions)
+                next_cost = cost + abs(source[source_order[i]] - target[target_order[j]]) ** 2
+                relax(state, next_state, next_cost, "match")
+            if i < len(source) and deaths < max_deaths:
+                next_state = (i + 1, j, deaths + 1, divisions)
+                next_cost = cost + skip_cost
+                relax(state, next_state, next_cost, "death")
+            if j < len(target) and divisions < min(MAX_CELL_DIVISIONS, max_deaths + 1):
+                next_state = (i, j + 1, deaths, divisions + 1)
+                next_cost = cost + skip_cost + target_degrees[target_order[j]] * 1e-5
+                relax(state, next_state, next_cost, "division")
+
+    terminals = [
+        state for state in costs
+        if state[0] == len(source) and state[1] == len(target) and state[3] == state[2] + 1
+    ]
+    best = min(terminals, key=lambda state: costs[state])
+    pairs: list[tuple[int, int]] = []
+    removed: list[int] = []
+    added: list[int] = []
+    state = best
+    while state != start:
+        previous, operation = parents[state]
+        i, j, _, _ = previous
+        if operation == "match":
+            pairs.append((source_order[i], target_order[j]))
+        elif operation == "death":
+            removed.append(source_order[i])
+        else:
+            added.append(target_order[j])
+        state = previous
+    pairs.reverse()
+    removed.reverse()
+    added.reverse()
+    return pairs, removed, added, costs[best] / max(1, len(pairs))
+
+
+def retained_edge_count(
+    previous_edges: Sequence[tuple[int, int]],
+    current_edges: Sequence[tuple[int, int]],
+    pairs: Sequence[tuple[int, int]],
+) -> tuple[int, int]:
+    mapping = dict(pairs)
+    current_set = {tuple(sorted(edge)) for edge in current_edges}
+    surviving = [(a, b) for a, b in previous_edges if a in mapping and b in mapping]
+    retained = sum(
+        tuple(sorted((mapping[a], mapping[b]))) in current_set
+        for a, b in surviving
     )
-    mapping = [-1] * n
-    for rank, source_index in enumerate(source_order):
-        target_rank = rank if rank < best_skip else rank + 1
-        mapping[source_index] = target_order[target_rank]
-    omitted = target_order[best_skip]
-    cost = (prefix[best_skip] + suffix[best_skip]) / max(1, n)
-    return mapping, omitted, cost
+    return retained, len(surviving)
 
 
-def choose_transmutation_alignment(previous_coordinates: Sequence[complex], current: GraphData) -> tuple[Isometry, list[int], int, float]:
-    previous_normalized = normalized_points(previous_coordinates)
-    previous_angle = principal_angle(previous_coordinates)
+def choose_transmutation_alignment(previous: GraphData, current: GraphData) -> tuple[Isometry, list[tuple[int, int]], list[int], list[int], float, str]:
+    previous_normalized = normalized_points(previous.coordinates)
+    previous_angle = principal_angle(previous.coordinates)
     raw_principal = principal_angle(current.raw_coordinates)
 
-    best: tuple[float, Isometry, list[int], int] | None = None
+    best: tuple[int, float, Isometry, list[tuple[int, int]], list[int], list[int], str] | None = None
     for reflect in (False, True):
         reflected_principal = -raw_principal if reflect else raw_principal
         base = previous_angle - reflected_principal
@@ -1074,17 +1145,44 @@ def choose_transmutation_alignment(previous_coordinates: Sequence[complex], curr
             angle = base + step * math.pi / 6
             unit = cmath.exp(1j * angle)
             linear = [((point.conjugate() if reflect else point) * unit) for point in current.raw_coordinates]
-            translation = centroid(previous_coordinates) - centroid(linear)
+            translation = centroid(previous.coordinates) - centroid(linear)
             displayed = [point + translation for point in linear]
             displayed_normalized = normalized_points(displayed)
-            mapping, omitted, cost = hilbert_mapping_one_extra(
+            full_pairs, _, full_added, full_cost = hilbert_mapping_with_replacements(
+                previous_normalized, displayed_normalized, current.degrees, max_deaths=0
+            )
+            full_retained, _ = retained_edge_count(previous.edges, current.edges, full_pairs)
+            if full_retained == len(previous.edges):
+                # Graph containment is the strongest signal: never manufacture
+                # deaths when every old edge survives under a one-cell mapping.
+                # This also detects equivalent constructions expressed in
+                # different algebraic hosts, such as the n=5 -> 6 division.
+                item = (
+                    0, full_cost, Isometry(angle, reflect, translation),
+                    full_pairs, [], full_added, "growth",
+                )
+                if best is None or item[:2] < best[:2]:
+                    best = item
+                continue
+
+            pairs, removed, added, cost = hilbert_mapping_with_replacements(
                 previous_normalized, displayed_normalized, current.degrees
             )
-            item = (cost + current.degrees[omitted] * 1e-5, Isometry(angle, reflect, translation), mapping, omitted)
-            if best is None or item[0] < best[0]:
+            retained, surviving = retained_edge_count(previous.edges, current.edges, pairs)
+            renewal = bool(removed) and retained == surviving and retained * 2 > len(previous.edges)
+            if removed and not renewal:
+                # Death is only meaningful when the remaining graph stays
+                # visibly intact. Otherwise use an ordinary transmutation with
+                # every old cell mapped and no misleading death animation.
+                pairs, removed, added, cost = hilbert_mapping_with_replacements(
+                    previous_normalized, displayed_normalized, current.degrees, max_deaths=0
+                )
+            kind = "renewal" if renewal else "transmutation"
+            item = (1 if renewal else 2, cost, Isometry(angle, reflect, translation), pairs, removed, added, kind)
+            if best is None or item[:2] < best[:2]:
                 best = item
     assert best is not None
-    return best[1], best[2], best[3], best[0]
+    return best[2], best[3], best[4], best[5], best[1], best[6]
 
 
 def exact_simple_alignment(previous: GraphData, current: GraphData, previous_transform: Isometry) -> tuple[Isometry, list[int], int] | None:
@@ -1187,27 +1285,45 @@ def make_record(
 def transition_for_pair(
     previous: GraphData | None,
     current: GraphData,
-    mapping: list[int] | None,
-    added: int | None,
+    pairs: list[tuple[int, int]] | None,
+    removed: list[int] | None,
+    added: list[int] | None,
     kind: str | None,
     mapping_cost: float | None,
 ) -> dict[str, object] | None:
-    if previous is None or mapping is None or added is None or kind is None:
+    if previous is None or pairs is None or removed is None or added is None or kind is None:
         return None
-    spawn, neighbors = spawn_point(current, added)
+    spawns = []
+    for vertex in added:
+        spawn, neighbors = spawn_point(current, vertex)
+        spawns.append({
+            "vertex": vertex,
+            "position": [round_number(spawn.real), round_number(spawn.imag)],
+            "neighbors": neighbors,
+        })
     retained_edges = 0
     if kind == "growth":
+        mapping = [target for _, target in sorted(pairs)]
         if not mapped_edges_preserved(previous.edges, current.edges, mapping):
             raise AssertionError(f"n={current.candidate.n}: growth did not retain all old edges")
         retained_edges = len(previous.edges)
+    elif kind == "renewal":
+        retained_edges, surviving_edges = retained_edge_count(previous.edges, current.edges, pairs)
+        if retained_edges != surviving_edges:
+            raise AssertionError(f"n={current.candidate.n}: renewal did not retain the surviving old edges")
     return {
         "from": previous.candidate.n,
         "kind": kind,
-        "oldToNew": mapping,
-        "addedVertex": added,
-        "spawn": [round_number(spawn.real), round_number(spawn.imag)],
-        "spawnNeighbors": neighbors,
-        "retainedVertices": len(mapping),
+        "retainedPairs": [list(pair) for pair in pairs],
+        "removedVertices": removed,
+        "addedVertices": added,
+        "spawns": spawns,
+        # Keep the original scalar fields for consumers of growth records.
+        "oldToNew": [target for _, target in sorted(pairs)] if not removed else None,
+        "addedVertex": added[0] if len(added) == 1 else None,
+        "spawn": spawns[0]["position"] if len(spawns) == 1 else None,
+        "spawnNeighbors": spawns[0]["neighbors"] if len(spawns) == 1 else [],
+        "retainedVertices": len(pairs),
         "retainedEdges": retained_edges,
         "mappingCost": None if mapping_cost is None else round(mapping_cost, 8),
         "animation": (
@@ -1267,8 +1383,9 @@ def materialize_sequence(
     for candidate in sequence:
         run = runs[candidate.run_id]
         graph = materialize_candidate(candidate, runs, host_cache)
-        mapping: list[int] | None = None
-        added: int | None = None
+        pairs: list[tuple[int, int]] | None = None
+        removed: list[int] | None = None
+        added: list[int] | None = None
         kind: str | None = None
         mapping_cost: float | None = None
 
@@ -1277,21 +1394,24 @@ def materialize_sequence(
         elif candidate.run_id == previous_graph.candidate.run_id:
             assert previous_transform is not None
             transform = previous_transform
-            mapping = list(range(previous_graph.candidate.n))
-            added = graph.candidate.n - 1
+            pairs = [(index, index) for index in range(previous_graph.candidate.n)]
+            removed = []
+            added = [graph.candidate.n - 1]
             kind = "growth"
         else:
             assert previous_transform is not None
             aligned = exact_simple_alignment(previous_graph, graph, previous_transform)
             if aligned is not None:
-                transform, mapping, added = aligned
+                transform, mapping, added_vertex = aligned
+                pairs = list(enumerate(mapping))
+                removed = []
+                added = [added_vertex]
                 kind = "growth"
             else:
-                transform, mapping, added, mapping_cost = choose_transmutation_alignment(previous_graph.coordinates, graph)
-                kind = "transmutation"
+                transform, pairs, removed, added, mapping_cost, kind = choose_transmutation_alignment(previous_graph, graph)
 
         graph.coordinates = apply_isometry(graph.raw_coordinates, transform)
-        transition = transition_for_pair(previous_graph, graph, mapping, added, kind, mapping_cost)
+        transition = transition_for_pair(previous_graph, graph, pairs, removed, added, kind, mapping_cost)
         record = make_record(
             graph,
             run,
@@ -1337,10 +1457,16 @@ def write_catalogs(root: Path, summaries: Sequence[dict[str, object]], sequence:
         "policy": [
             "strict record edge count",
             "maximum number of one-vertex growth transitions",
+            "maximum new unit edges introduced by those growth transitions",
             "minimum host-family changes",
             "visual balance among remaining ties",
         ],
         "growthTransitions": sum(1 for summary in summaries if summary.get("transition") == "growth"),
+        "growthEdgesIntroduced": sum(
+            int(summaries[index]["edges"]) - int(summaries[index - 1]["edges"])
+            for index in range(1, len(summaries))
+            if summaries[index].get("transition") == "growth"
+        ),
         "selection": [
             {
                 "n": candidate.n,

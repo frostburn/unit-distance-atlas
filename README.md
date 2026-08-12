@@ -102,13 +102,33 @@ When the strict record for `n + 1` contains the selected `n` graph:
 
 The old edge set remains visible throughout.
 
+Containment is checked before cell renewal, including between drawings from
+different algebraic hosts. If one additional cell preserves every old edge,
+the transition is always a single division; the spatial matcher is not allowed
+to replace that division with unnecessary deaths.
+
+### Cell renewal
+
+When removing at most two cells leaves all edges between the surviving cells
+present in the next record:
+
+1. those retained cells and edges remain continuously visible;
+2. up to two cells die with only their incident edges disappearing;
+3. up to three replacement cells divide into the new drawing;
+4. new edges grow in without blanking the graph.
+
+Cell death is never used merely to improve a spatial assignment. More than half
+of the old edge set must survive, and every edge whose endpoints survive must
+still exist after mapping; otherwise the transition keeps every cell and uses
+a transmutation.
+
 ### Transmutation
 
-When strict records cannot be related by one added vertex:
+When neither growth nor structure-preserving renewal is possible:
 
 1. the old edges fade completely;
-2. cells migrate along gently curved paths using the stored old-to-new mapping;
-3. the extra cell appears during migration;
+2. every old cell migrates along a gently curved path;
+3. the one additional cell appears during migration;
 4. only near the end do the new record edges fade in.
 
 Thus a host change reads as a deliberate reorganization rather than as a jump
@@ -147,9 +167,15 @@ global dynamic-programming pass then chooses the strict-record movie path
 lexicographically by:
 
 1. number of genuine one-cell growth transitions;
-2. number of adjacent frames in the same host family;
-3. accumulated visual-balance score;
-4. accumulated record streak length.
+2. number of new unit edges introduced by those growth transitions;
+3. number of adjacent frames in the same host family;
+4. accumulated visual-balance score;
+5. accumulated record streak length.
+
+The second rule favors visually meaningful divisions over symmetry in an
+individual still. For example, when growth counts tie, it selects the
+incomplete six-cell hexagon that divides directly into the filled seven-cell
+hexagon rather than a more symmetric six-cell triforce that must transmute.
 
 This is deliberately different from independently choosing the prettiest frame
 at every `n`.
@@ -201,10 +227,10 @@ A record contains:
   "host": { "family": "moser" },
   "transition": {
     "kind": "growth",
-    "oldToNew": [0, 1, 2],
-    "addedVertex": 1177,
-    "spawn": [0.0, 0.0],
-    "spawnNeighbors": [12, 47, 301]
+    "retainedPairs": [[0, 0], [1, 1], [2, 2]],
+    "removedVertices": [],
+    "addedVertices": [1177],
+    "spawns": [{"vertex": 1177, "position": [0.0, 0.0], "neighbors": [12, 47, 301]}]
   },
   "geometry": {
     "coordinates": [[0.0, 0.0]],
