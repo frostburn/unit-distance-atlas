@@ -62,6 +62,8 @@
     frameHandle: 0,
     lastFrame: 0,
     hoverIndex: -1,
+    hoverVertex: -1,
+    stageHitScene: null,
     tooltipToken: 0,
     chartMetrics: null,
     prefersReducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -437,13 +439,17 @@
     ctx.restore();
   }
 
-  function drawIncidentEdges(ctx, record, positions, vertex, alpha, style, dpr) {
+  function drawIncidentEdges(ctx, record, positions, vertex, alpha, style, dpr, highlight = false) {
     if (alpha <= 0.001 || vertex == null) return;
     ctx.save();
-    ctx.globalAlpha = clamp(0, alpha * style.edgeAlpha, 1);
-    ctx.strokeStyle = cssColor("--graph-edge", "#5ee7f4");
-    ctx.lineWidth = style.edgeWidth * Math.sqrt(view.zoom) * dpr;
+    ctx.globalAlpha = clamp(0, alpha * (highlight ? 0.95 : style.edgeAlpha), 1);
+    ctx.strokeStyle = highlight ? cssColor("--graph-new-edge", "#fbbf24") : cssColor("--graph-edge", "#5ee7f4");
+    ctx.lineWidth = style.edgeWidth * (highlight ? 2.35 : 1) * Math.sqrt(view.zoom) * dpr;
     ctx.lineCap = "round";
+    if (highlight) {
+      ctx.shadowColor = cssColor("--graph-new-edge-glow", "#f59e0b");
+      ctx.shadowBlur = style.glowBlur * 1.5 * dpr;
+    }
     ctx.beginPath();
     for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
       const a = record.edgeIndices[offset];
@@ -459,6 +465,52 @@
     }
     ctx.stroke();
     ctx.restore();
+  }
+
+  function neighborhood(record, vertex) {
+    const neighbors = new Set();
+    for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
+      const a = record.edgeIndices[offset];
+      const b = record.edgeIndices[offset + 1];
+      if (a === vertex) neighbors.add(b);
+      else if (b === vertex) neighbors.add(a);
+    }
+    const vertices = new Set([vertex, ...neighbors]);
+    const edges = [];
+    // Include every edge connected to the selected vertex or one of its
+    // neighbours, exposing the local structure beyond the immediate spokes.
+    for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
+      const a = record.edgeIndices[offset];
+      const b = record.edgeIndices[offset + 1];
+      if (vertices.has(a) || vertices.has(b)) edges.push(a, b);
+    }
+    const visibleVertices = new Set(vertices);
+    edges.forEach((index) => visibleVertices.add(index));
+    return { vertices: visibleVertices, edges };
+  }
+
+  function drawHoverNeighborhood(ctx, record, positions, vertex, style, dpr) {
+    const local = neighborhood(record, vertex);
+    ctx.save();
+    ctx.globalAlpha = 0.94;
+    ctx.strokeStyle = cssColor("--graph-focus-edge", "#a5f3fc");
+    ctx.lineWidth = Math.max(1.4, style.edgeWidth * 2.1 * Math.sqrt(view.zoom)) * dpr;
+    ctx.lineCap = "round";
+    ctx.shadowColor = cssColor("--graph-glow", "#22d3ee");
+    ctx.shadowBlur = style.glowBlur * dpr;
+    ctx.beginPath();
+    for (let offset = 0; offset < local.edges.length; offset += 2) {
+      const a = local.edges[offset];
+      const b = local.edges[offset + 1];
+      ctx.moveTo(positions[2 * a] * dpr, positions[2 * a + 1] * dpr);
+      ctx.lineTo(positions[2 * b] * dpr, positions[2 * b + 1] * dpr);
+    }
+    ctx.stroke();
+    ctx.restore();
+    const nodes = [...local.vertices].map((index) => ({
+      x: positions[2 * index], y: positions[2 * index + 1], scale: index === vertex ? 1.7 : 1.28,
+    }));
+    drawNodes(ctx, nodes, style, dpr);
   }
 
   function drawNodes(ctx, nodes, style, dpr, alpha = 1) {
@@ -521,8 +573,11 @@
     const camera = fitBounds(record.bounds, metrics.width, metrics.height);
     const screen = toScreenPositions(record.coordinates, camera, metrics.width, metrics.height);
     const style = visualStyle(record.n, record.averageDegree);
-    drawEdgeSet(ctx, record, screen, 1, style, metrics.dpr);
-    drawNodes(ctx, nodesFromPositions(screen), style, metrics.dpr);
+    const isHovering = state.hoverVertex >= 0;
+    drawEdgeSet(ctx, record, screen, isHovering ? 0.24 : 1, style, metrics.dpr);
+    drawNodes(ctx, nodesFromPositions(screen), style, metrics.dpr, isHovering ? 0.32 : 1);
+    if (isHovering && state.hoverVertex < record.n) drawHoverNeighborhood(ctx, record, screen, state.hoverVertex, style, metrics.dpr);
+    state.stageHitScene = { record, positions: screen, style };
   }
 
   function renderAnimation(animation, progress, ctx, metrics) {
@@ -548,7 +603,7 @@
       if (animation.direction > 0) {
         drawEdgeSet(ctx, animation.source, sourceScreen, 1, style, metrics.dpr);
         animation.extraTarget.forEach((added) => {
-          drawIncidentEdges(ctx, animation.target, targetScreen, added, smoothstep(0.18, 0.92, progress), style, metrics.dpr);
+          drawIncidentEdges(ctx, animation.target, targetScreen, added, smoothstep(0.18, 0.92, progress), style, metrics.dpr, true);
         });
       } else {
         drawEdgeSet(ctx, animation.target, targetScreen, 1, style, metrics.dpr);
@@ -606,6 +661,9 @@
     ctx.clearRect(0, 0, elements.graphCanvas.width, elements.graphCanvas.height);
 
     if (state.animation) {
+      state.stageHitScene = null;
+      state.hoverVertex = -1;
+      elements.stage.classList.remove("has-vertex-hover");
       const elapsed = now - state.animation.startedAt;
       const progress = clamp(0, elapsed / state.animation.duration, 1);
       renderAnimation(state.animation, progress, ctx, metrics);
@@ -763,6 +821,7 @@
   }
 
   function beginPointer(event) {
+    state.hoverVertex = -1;
     elements.stage.setPointerCapture(event.pointerId);
     view.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (view.pointers.size === 1) {
@@ -820,6 +879,36 @@
     } else if (view.pointers.size === 0) {
       view.gesture = null;
     }
+  }
+
+  function updateStageHover(event) {
+    if (event.pointerType === "touch" || view.pointers.size || !state.stageHitScene) return;
+    const rect = elements.graphCanvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const { record, positions, style } = state.stageHitScene;
+    const hitRadius = Math.max(9, style.nodeRadius * Math.sqrt(view.zoom) + 5);
+    let closest = -1;
+    let closestDistance = hitRadius;
+    for (let index = 0; index < record.n; index += 1) {
+      const distance = Math.hypot(x - positions[2 * index], y - positions[2 * index + 1]);
+      if (distance <= closestDistance) {
+        closest = index;
+        closestDistance = distance;
+      }
+    }
+    if (closest !== state.hoverVertex) {
+      state.hoverVertex = closest;
+      elements.stage.classList.toggle("has-vertex-hover", closest >= 0);
+      requestStageFrame();
+    }
+  }
+
+  function clearStageHover() {
+    if (state.hoverVertex < 0) return;
+    state.hoverVertex = -1;
+    elements.stage.classList.remove("has-vertex-hover");
+    requestStageFrame();
   }
 
   function chartTheme() {
@@ -1049,6 +1138,8 @@
     }, { passive: false });
     elements.stage.addEventListener("pointerdown", beginPointer);
     elements.stage.addEventListener("pointermove", movePointer);
+    elements.stage.addEventListener("pointermove", updateStageHover);
+    elements.stage.addEventListener("pointerleave", clearStageHover);
     elements.stage.addEventListener("pointerup", endPointer);
     elements.stage.addEventListener("pointercancel", endPointer);
     elements.recordChart.addEventListener("pointermove", showChartTooltip);
