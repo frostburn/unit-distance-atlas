@@ -4,10 +4,4 @@ __pycache__/
 # catalog.local.json and search archives are useful local state; choose whether
 # to commit them in the repository that embeds this project.
 
-data/catalog.local.json
-data/sequence.json
-data/search/runs/*
-data/records/[1-9][0-9][0-9][0-9].json
-data/records/02[0-9][0-9].json
-data/records/0[3-9][0-9][0-9].json
-!data/records/0200.json
+data/*
