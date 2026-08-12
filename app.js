@@ -761,6 +761,10 @@
     updateControls();
     drawChart();
     prefetchAround(state.currentIndex);
+    // The animation frame deliberately has no hit scene. Render the settled
+    // graph once more so hover hit-testing is ready immediately, even when
+    // playback is paused and nothing else would request another frame.
+    requestStageFrame();
   }
 
   async function navigateTo(index, { animate = true } = {}) {
