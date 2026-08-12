@@ -338,6 +338,7 @@
       extraSource: mapping.extraSource,
       extraTarget: mapping.extraTarget,
       transition,
+      highlightFadeStartedAt: null,
       startedAt: performance.now(),
       duration: state.prefersReducedMotion ? 1 : baseDuration / state.speed,
     };
@@ -602,8 +603,17 @@
     if (animation.kind === "growth") {
       if (animation.direction > 0) {
         drawEdgeSet(ctx, animation.source, sourceScreen, 1, style, metrics.dpr);
+        const grown = smoothstep(0.18, 0.62, progress);
+        const settled = 1 - smoothstep(0.58, 0.86, progress);
+        const pauseFade = animation.highlightFadeStartedAt == null
+          ? 1
+          : 1 - smoothstep(0, 240, performance.now() - animation.highlightFadeStartedAt);
+        const highlightAlpha = grown * settled * pauseFade;
         animation.extraTarget.forEach((added) => {
-          drawIncidentEdges(ctx, animation.target, targetScreen, added, smoothstep(0.18, 0.92, progress), style, metrics.dpr, true);
+          // Draw the ordinary edge underneath so the amber emphasis can fade
+          // without making the newly created structure disappear.
+          drawIncidentEdges(ctx, animation.target, targetScreen, added, grown, style, metrics.dpr);
+          drawIncidentEdges(ctx, animation.target, targetScreen, added, highlightAlpha, style, metrics.dpr, true);
         });
       } else {
         drawEdgeSet(ctx, animation.target, targetScreen, 1, style, metrics.dpr);
@@ -783,7 +793,12 @@
   }
 
   function togglePlay() {
+    const wasPlaying = state.playing;
     state.playing = !state.playing;
+    if (wasPlaying && !state.playing && state.animation?.kind === "growth"
+      && state.animation.direction > 0 && state.animation.highlightFadeStartedAt == null) {
+      state.animation.highlightFadeStartedAt = performance.now();
+    }
     if (state.playing && state.currentIndex >= state.summaries.length - 1 && !state.animation) {
       navigateTo(0, { animate: false });
     }
