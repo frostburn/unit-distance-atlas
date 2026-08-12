@@ -64,6 +64,7 @@
     hoverIndex: -1,
     hoverVertex: -1,
     stageHitScene: null,
+    stagePointer: null,
     tooltipToken: 0,
     chartMetrics: null,
     prefersReducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -477,49 +478,61 @@
       else if (b === vertex) neighbors.add(a);
     }
     const vertices = new Set([vertex, ...neighbors]);
-    const edges = [];
+    const primaryEdges = [];
+    const secondaryEdges = [];
     // Include every edge connected to the selected vertex or one of its
     // neighbours, exposing the local structure beyond the immediate spokes.
     for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
       const a = record.edgeIndices[offset];
       const b = record.edgeIndices[offset + 1];
-      if (vertices.has(a) || vertices.has(b)) edges.push(a, b);
+      if (a === vertex || b === vertex) primaryEdges.push(a, b);
+      else if (vertices.has(a) || vertices.has(b)) secondaryEdges.push(a, b);
     }
-    const visibleVertices = new Set(vertices);
-    edges.forEach((index) => visibleVertices.add(index));
-    return { vertices: visibleVertices, edges };
+    const tertiaryVertices = new Set();
+    secondaryEdges.forEach((index) => {
+      if (!vertices.has(index)) tertiaryVertices.add(index);
+    });
+    return { neighbors, primaryEdges, secondaryEdges, tertiaryVertices };
   }
 
   function drawHoverNeighborhood(ctx, record, positions, vertex, style, dpr) {
     const local = neighborhood(record, vertex);
-    ctx.save();
-    ctx.globalAlpha = 0.94;
-    ctx.strokeStyle = cssColor("--graph-focus-edge", "#a5f3fc");
-    ctx.lineWidth = Math.max(1.4, style.edgeWidth * 2.1 * Math.sqrt(view.zoom)) * dpr;
-    ctx.lineCap = "round";
-    ctx.shadowColor = cssColor("--graph-glow", "#22d3ee");
-    ctx.shadowBlur = style.glowBlur * dpr;
-    ctx.beginPath();
-    for (let offset = 0; offset < local.edges.length; offset += 2) {
-      const a = local.edges[offset];
-      const b = local.edges[offset + 1];
-      ctx.moveTo(positions[2 * a] * dpr, positions[2 * a + 1] * dpr);
-      ctx.lineTo(positions[2 * b] * dpr, positions[2 * b + 1] * dpr);
-    }
-    ctx.stroke();
-    ctx.restore();
-    const nodes = [...local.vertices].map((index) => ({
+    const drawLocalEdges = (edges, color, alpha, width) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1.4, style.edgeWidth * width * Math.sqrt(view.zoom)) * dpr;
+      ctx.lineCap = "round";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = style.glowBlur * dpr;
+      ctx.beginPath();
+      for (let offset = 0; offset < edges.length; offset += 2) {
+        const a = edges[offset];
+        const b = edges[offset + 1];
+        ctx.moveTo(positions[2 * a] * dpr, positions[2 * a + 1] * dpr);
+        ctx.lineTo(positions[2 * b] * dpr, positions[2 * b + 1] * dpr);
+      }
+      ctx.stroke();
+      ctx.restore();
+    };
+    drawLocalEdges(local.secondaryEdges, cssColor("--graph-secondary-edge", "#c084fc"), 0.78, 1.65);
+    drawLocalEdges(local.primaryEdges, cssColor("--graph-focus-edge", "#a5f3fc"), 0.96, 2.1);
+    const primaryNodes = [vertex, ...local.neighbors].map((index) => ({
       x: positions[2 * index], y: positions[2 * index + 1], scale: index === vertex ? 1.7 : 1.28,
     }));
-    drawNodes(ctx, nodes, style, dpr);
+    drawNodes(ctx, primaryNodes, style, dpr);
+    const tertiaryNodes = [...local.tertiaryVertices].map((index) => ({
+      x: positions[2 * index], y: positions[2 * index + 1], scale: 1.12,
+    }));
+    drawNodes(ctx, tertiaryNodes, style, dpr, 1, cssColor("--graph-tertiary-node", "#e9d5ff"));
   }
 
-  function drawNodes(ctx, nodes, style, dpr, alpha = 1) {
+  function drawNodes(ctx, nodes, style, dpr, alpha = 1, fillColor = null) {
     if (!nodes.length || alpha <= 0.001) return;
     const radius = style.nodeRadius * Math.sqrt(view.zoom) * dpr;
     ctx.save();
     ctx.globalAlpha = alpha * style.nodeAlpha;
-    ctx.fillStyle = cssColor("--graph-node", "#f8fbff");
+    ctx.fillStyle = fillColor || cssColor("--graph-node", "#f8fbff");
     ctx.strokeStyle = cssColor("--graph-outline", "#06101c");
     ctx.lineWidth = style.outlineWidth * dpr;
     ctx.shadowColor = cssColor("--graph-glow", "#22d3ee");
@@ -579,6 +592,7 @@
     drawNodes(ctx, nodesFromPositions(screen), style, metrics.dpr, isHovering ? 0.32 : 1);
     if (isHovering && state.hoverVertex < record.n) drawHoverNeighborhood(ctx, record, screen, state.hoverVertex, style, metrics.dpr);
     state.stageHitScene = { record, positions: screen, style };
+    if (state.stagePointer) updateStageHover();
   }
 
   function renderAnimation(animation, progress, ctx, metrics) {
@@ -896,11 +910,15 @@
     }
   }
 
-  function updateStageHover(event) {
-    if (event.pointerType === "touch" || view.pointers.size || !state.stageHitScene) return;
+  function updateStageHover(event = null) {
+    if (event) {
+      if (event.pointerType === "touch") return;
+      state.stagePointer = { clientX: event.clientX, clientY: event.clientY };
+    }
+    if (view.pointers.size || !state.stageHitScene || !state.stagePointer) return;
     const rect = elements.graphCanvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const x = state.stagePointer.clientX - rect.left;
+    const y = state.stagePointer.clientY - rect.top;
     const { record, positions, style } = state.stageHitScene;
     const hitRadius = Math.max(9, style.nodeRadius * Math.sqrt(view.zoom) + 5);
     let closest = -1;
@@ -920,6 +938,7 @@
   }
 
   function clearStageHover() {
+    state.stagePointer = null;
     if (state.hoverVertex < 0) return;
     state.hoverVertex = -1;
     elements.stage.classList.remove("has-vertex-hover");
@@ -1152,6 +1171,7 @@
       zoomAt(Math.exp(-event.deltaY * 0.0012), event.clientX, event.clientY);
     }, { passive: false });
     elements.stage.addEventListener("pointerdown", beginPointer);
+    elements.stage.addEventListener("pointerenter", updateStageHover);
     elements.stage.addEventListener("pointermove", movePointer);
     elements.stage.addEventListener("pointermove", updateStageHover);
     elements.stage.addEventListener("pointerleave", clearStageHover);

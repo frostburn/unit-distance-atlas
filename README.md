@@ -83,7 +83,7 @@ python generate.py --max-n 2000 --restarts 32 --seed 20260810 --publish
 - **Pinch zoom and two-finger pan** work on touch devices.
 - **Left/Right arrows** step, **Space** plays or pauses, and **0** resets the
   camera.
-- Hovering over a graph vertex isolates its neighbours, connected edges, and the edges extending from those neighbours. Newly created edges glow amber during cell division.
+- Hovering over a graph vertex isolates its neighbours and primary edges, with secondary edges and tertiary vertices shown in a contrasting color. Newly created edges glow amber during cell division.
 - Hovering over the record chart loads and renders a live Canvas miniature;
   clicking the chart animates to that frame.
 
