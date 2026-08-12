@@ -62,6 +62,9 @@
     frameHandle: 0,
     lastFrame: 0,
     hoverIndex: -1,
+    hoverVertex: -1,
+    stageHitScene: null,
+    stagePointer: null,
     tooltipToken: 0,
     chartMetrics: null,
     prefersReducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -336,6 +339,7 @@
       extraSource: mapping.extraSource,
       extraTarget: mapping.extraTarget,
       transition,
+      highlightFadeStartedAt: null,
       startedAt: performance.now(),
       duration: state.prefersReducedMotion ? 1 : baseDuration / state.speed,
     };
@@ -437,13 +441,17 @@
     ctx.restore();
   }
 
-  function drawIncidentEdges(ctx, record, positions, vertex, alpha, style, dpr) {
+  function drawIncidentEdges(ctx, record, positions, vertex, alpha, style, dpr, highlight = false) {
     if (alpha <= 0.001 || vertex == null) return;
     ctx.save();
-    ctx.globalAlpha = clamp(0, alpha * style.edgeAlpha, 1);
-    ctx.strokeStyle = cssColor("--graph-edge", "#5ee7f4");
-    ctx.lineWidth = style.edgeWidth * Math.sqrt(view.zoom) * dpr;
+    ctx.globalAlpha = clamp(0, alpha * (highlight ? 0.95 : style.edgeAlpha), 1);
+    ctx.strokeStyle = highlight ? cssColor("--graph-new-edge", "#fbbf24") : cssColor("--graph-edge", "#5ee7f4");
+    ctx.lineWidth = style.edgeWidth * (highlight ? 2.35 : 1) * Math.sqrt(view.zoom) * dpr;
     ctx.lineCap = "round";
+    if (highlight) {
+      ctx.shadowColor = cssColor("--graph-new-edge-glow", "#f59e0b");
+      ctx.shadowBlur = style.glowBlur * 1.5 * dpr;
+    }
     ctx.beginPath();
     for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
       const a = record.edgeIndices[offset];
@@ -461,12 +469,70 @@
     ctx.restore();
   }
 
-  function drawNodes(ctx, nodes, style, dpr, alpha = 1) {
+  function neighborhood(record, vertex) {
+    const neighbors = new Set();
+    for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
+      const a = record.edgeIndices[offset];
+      const b = record.edgeIndices[offset + 1];
+      if (a === vertex) neighbors.add(b);
+      else if (b === vertex) neighbors.add(a);
+    }
+    const vertices = new Set([vertex, ...neighbors]);
+    const primaryEdges = [];
+    const secondaryEdges = [];
+    // Include every edge connected to the selected vertex or one of its
+    // neighbours, exposing the local structure beyond the immediate spokes.
+    for (let offset = 0; offset < record.edgeIndices.length; offset += 2) {
+      const a = record.edgeIndices[offset];
+      const b = record.edgeIndices[offset + 1];
+      if (a === vertex || b === vertex) primaryEdges.push(a, b);
+      else if (vertices.has(a) || vertices.has(b)) secondaryEdges.push(a, b);
+    }
+    const tertiaryVertices = new Set();
+    secondaryEdges.forEach((index) => {
+      if (!vertices.has(index)) tertiaryVertices.add(index);
+    });
+    return { neighbors, primaryEdges, secondaryEdges, tertiaryVertices };
+  }
+
+  function drawHoverNeighborhood(ctx, record, positions, vertex, style, dpr) {
+    const local = neighborhood(record, vertex);
+    const drawLocalEdges = (edges, color, alpha, width) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1.4, style.edgeWidth * width * Math.sqrt(view.zoom)) * dpr;
+      ctx.lineCap = "round";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = style.glowBlur * dpr;
+      ctx.beginPath();
+      for (let offset = 0; offset < edges.length; offset += 2) {
+        const a = edges[offset];
+        const b = edges[offset + 1];
+        ctx.moveTo(positions[2 * a] * dpr, positions[2 * a + 1] * dpr);
+        ctx.lineTo(positions[2 * b] * dpr, positions[2 * b + 1] * dpr);
+      }
+      ctx.stroke();
+      ctx.restore();
+    };
+    drawLocalEdges(local.secondaryEdges, cssColor("--graph-secondary-edge", "#c084fc"), 0.78, 1.65);
+    drawLocalEdges(local.primaryEdges, cssColor("--graph-focus-edge", "#a5f3fc"), 0.96, 2.1);
+    const primaryNodes = [vertex, ...local.neighbors].map((index) => ({
+      x: positions[2 * index], y: positions[2 * index + 1], scale: index === vertex ? 1.7 : 1.28,
+    }));
+    drawNodes(ctx, primaryNodes, style, dpr);
+    const tertiaryNodes = [...local.tertiaryVertices].map((index) => ({
+      x: positions[2 * index], y: positions[2 * index + 1], scale: 1.12,
+    }));
+    drawNodes(ctx, tertiaryNodes, style, dpr, 1, cssColor("--graph-tertiary-node", "#e9d5ff"));
+  }
+
+  function drawNodes(ctx, nodes, style, dpr, alpha = 1, fillColor = null) {
     if (!nodes.length || alpha <= 0.001) return;
     const radius = style.nodeRadius * Math.sqrt(view.zoom) * dpr;
     ctx.save();
     ctx.globalAlpha = alpha * style.nodeAlpha;
-    ctx.fillStyle = cssColor("--graph-node", "#f8fbff");
+    ctx.fillStyle = fillColor || cssColor("--graph-node", "#f8fbff");
     ctx.strokeStyle = cssColor("--graph-outline", "#06101c");
     ctx.lineWidth = style.outlineWidth * dpr;
     ctx.shadowColor = cssColor("--graph-glow", "#22d3ee");
@@ -521,8 +587,12 @@
     const camera = fitBounds(record.bounds, metrics.width, metrics.height);
     const screen = toScreenPositions(record.coordinates, camera, metrics.width, metrics.height);
     const style = visualStyle(record.n, record.averageDegree);
-    drawEdgeSet(ctx, record, screen, 1, style, metrics.dpr);
-    drawNodes(ctx, nodesFromPositions(screen), style, metrics.dpr);
+    const isHovering = state.hoverVertex >= 0;
+    drawEdgeSet(ctx, record, screen, isHovering ? 0.24 : 1, style, metrics.dpr);
+    drawNodes(ctx, nodesFromPositions(screen), style, metrics.dpr, isHovering ? 0.32 : 1);
+    if (isHovering && state.hoverVertex < record.n) drawHoverNeighborhood(ctx, record, screen, state.hoverVertex, style, metrics.dpr);
+    state.stageHitScene = { record, positions: screen, style };
+    if (state.stagePointer) updateStageHover();
   }
 
   function renderAnimation(animation, progress, ctx, metrics) {
@@ -547,8 +617,17 @@
     if (animation.kind === "growth") {
       if (animation.direction > 0) {
         drawEdgeSet(ctx, animation.source, sourceScreen, 1, style, metrics.dpr);
+        const grown = smoothstep(0.18, 0.62, progress);
+        const settled = 1 - smoothstep(0.58, 0.86, progress);
+        const pauseFade = animation.highlightFadeStartedAt == null
+          ? 1
+          : 1 - smoothstep(0, 240, performance.now() - animation.highlightFadeStartedAt);
+        const highlightAlpha = grown * settled * pauseFade;
         animation.extraTarget.forEach((added) => {
-          drawIncidentEdges(ctx, animation.target, targetScreen, added, smoothstep(0.18, 0.92, progress), style, metrics.dpr);
+          // Draw the ordinary edge underneath so the amber emphasis can fade
+          // without making the newly created structure disappear.
+          drawIncidentEdges(ctx, animation.target, targetScreen, added, grown, style, metrics.dpr);
+          drawIncidentEdges(ctx, animation.target, targetScreen, added, highlightAlpha, style, metrics.dpr, true);
         });
       } else {
         drawEdgeSet(ctx, animation.target, targetScreen, 1, style, metrics.dpr);
@@ -606,6 +685,9 @@
     ctx.clearRect(0, 0, elements.graphCanvas.width, elements.graphCanvas.height);
 
     if (state.animation) {
+      state.stageHitScene = null;
+      state.hoverVertex = -1;
+      elements.stage.classList.remove("has-vertex-hover");
       const elapsed = now - state.animation.startedAt;
       const progress = clamp(0, elapsed / state.animation.duration, 1);
       renderAnimation(state.animation, progress, ctx, metrics);
@@ -679,6 +761,10 @@
     updateControls();
     drawChart();
     prefetchAround(state.currentIndex);
+    // The animation frame deliberately has no hit scene. Render the settled
+    // graph once more so hover hit-testing is ready immediately, even when
+    // playback is paused and nothing else would request another frame.
+    requestStageFrame();
   }
 
   async function navigateTo(index, { animate = true } = {}) {
@@ -725,7 +811,12 @@
   }
 
   function togglePlay() {
+    const wasPlaying = state.playing;
     state.playing = !state.playing;
+    if (wasPlaying && !state.playing && state.animation?.kind === "growth"
+      && state.animation.direction > 0 && state.animation.highlightFadeStartedAt == null) {
+      state.animation.highlightFadeStartedAt = performance.now();
+    }
     if (state.playing && state.currentIndex >= state.summaries.length - 1 && !state.animation) {
       navigateTo(0, { animate: false });
     }
@@ -763,6 +854,7 @@
   }
 
   function beginPointer(event) {
+    state.hoverVertex = -1;
     elements.stage.setPointerCapture(event.pointerId);
     view.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (view.pointers.size === 1) {
@@ -820,6 +912,41 @@
     } else if (view.pointers.size === 0) {
       view.gesture = null;
     }
+  }
+
+  function updateStageHover(event = null) {
+    if (event) {
+      if (event.pointerType === "touch") return;
+      state.stagePointer = { clientX: event.clientX, clientY: event.clientY };
+    }
+    if (view.pointers.size || !state.stageHitScene || !state.stagePointer) return;
+    const rect = elements.graphCanvas.getBoundingClientRect();
+    const x = state.stagePointer.clientX - rect.left;
+    const y = state.stagePointer.clientY - rect.top;
+    const { record, positions, style } = state.stageHitScene;
+    const hitRadius = Math.max(9, style.nodeRadius * Math.sqrt(view.zoom) + 5);
+    let closest = -1;
+    let closestDistance = hitRadius;
+    for (let index = 0; index < record.n; index += 1) {
+      const distance = Math.hypot(x - positions[2 * index], y - positions[2 * index + 1]);
+      if (distance <= closestDistance) {
+        closest = index;
+        closestDistance = distance;
+      }
+    }
+    if (closest !== state.hoverVertex) {
+      state.hoverVertex = closest;
+      elements.stage.classList.toggle("has-vertex-hover", closest >= 0);
+      requestStageFrame();
+    }
+  }
+
+  function clearStageHover() {
+    state.stagePointer = null;
+    if (state.hoverVertex < 0) return;
+    state.hoverVertex = -1;
+    elements.stage.classList.remove("has-vertex-hover");
+    requestStageFrame();
   }
 
   function chartTheme() {
@@ -1048,7 +1175,10 @@
       zoomAt(Math.exp(-event.deltaY * 0.0012), event.clientX, event.clientY);
     }, { passive: false });
     elements.stage.addEventListener("pointerdown", beginPointer);
+    elements.stage.addEventListener("pointerenter", updateStageHover);
     elements.stage.addEventListener("pointermove", movePointer);
+    elements.stage.addEventListener("pointermove", updateStageHover);
+    elements.stage.addEventListener("pointerleave", clearStageHover);
     elements.stage.addEventListener("pointerup", endPointer);
     elements.stage.addEventListener("pointercancel", endPointer);
     elements.recordChart.addEventListener("pointermove", showChartTooltip);
